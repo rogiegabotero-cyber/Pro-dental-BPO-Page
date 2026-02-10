@@ -1,5 +1,5 @@
-import dent_logo from "../assets/Image/1.png"
-import dent_logo2 from "../assets/Image/2.png"
+import dent_logo from "../assets/Image/1.webp"
+import dent_logo2 from "../assets/Image/2.webp"
 import {
   FaPhoneAlt,
   FaMapMarkerAlt,
