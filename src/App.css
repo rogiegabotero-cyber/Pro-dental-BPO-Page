@@ -1,0 +1,60 @@
+@import url(../src/assets/Style/navbar.css);
+@import url(../src/assets/Style/about.css);
+@import url(../src/assets/Style/services.css);
+@import url(../src/assets/Style/footer.css);
+@import url(../src/assets/Style/hero.css);
+@import url(../src/assets/Style/review.css);
+@import url(../src/assets/Style/contact.css);
+
+@import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+
+
+
+:root {
+  --primary: #0b8f9e;
+  --primary-dark: #0b8f9e;
+  --bg-soft: #ecfcff;
+  --bg-white: #ffffff;
+  --text-dark: #0f172a;
+  --text-muted: #475569;
+  --radius-xl: 24px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+
+}
+
+
+
+body {
+  font-family: "DM sans", system-ui, sans-serif;
+  color: var(--text-dark);
+  background: #f9feff;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+
+.section-tag {
+  color: var(--text-dark);
+  font-weight: 600;
+  display: inline-block;
+  margin-bottom: 12px;
+}
+
+.services, .contact, .about, .reviews {
+  scroll-margin-top: 4.2rem; 
+}
+

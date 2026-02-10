@@ -1,0 +1,237 @@
+/* =========================
+   SERVICES SECTION
+========================= */
+
+.services {
+  padding: clamp(72px, 8vw, 96px) clamp(24px, 6vw, 72px);
+  background: linear-gradient(
+    180deg,
+    #d9f7fb 0%,
+    #ffffff 100%
+  );
+}
+
+/* INITIAL HIDDEN STATE */
+.services,
+.services h2,
+.service-card {
+  opacity: 0;
+  transform: translateY(40px);
+  text-align: center;
+}
+
+/* =========================
+   ANIMATION TRIGGER
+========================= */
+
+.services.services-animate {
+  animation: fadeUp 0.6s ease forwards;
+}
+
+.services.services-animate h2 {
+  animation: fadeUp 0.6s ease forwards;
+  animation-delay: 0.1s;
+}
+
+.services.services-animate .service-card {
+  animation: fadeUp 0.7s ease forwards;
+}
+
+/* STAGGER CARDS */
+.services.services-animate .service-card:nth-child(1) { animation-delay: 0.2s; }
+.services.services-animate .service-card:nth-child(2) { animation-delay: 0.3s; }
+.services.services-animate .service-card:nth-child(3) { animation-delay: 0.4s; }
+.services.services-animate .service-card:nth-child(4) { animation-delay: 0.5s; }
+
+/* =========================
+   HEADER
+========================= */
+
+.services h2 {
+  text-align: center;
+  font-size: clamp(30px, 5vw, 36px);
+  margin-bottom: clamp(40px, 6vw, 48px);
+}
+
+/* =========================
+   GRID
+========================= */
+
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(24px, 4vw, 32px);
+  align-items: stretch;
+}
+
+/* =========================
+   CARD
+========================= */
+
+.service-card {
+  background: white;
+  border-radius: 24px;
+  padding: clamp(28px, 4vw, 36px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.service-card:hover {
+   transform: scale(1.04) !important;
+  box-shadow:
+    0 20px 40px rgba(14, 165, 183, 0.25),
+    0 0 0 1px rgba(14, 165, 183, 0.25);
+  background: #ffffff;
+}
+
+.service-card h3 {
+  font-size: 20px;
+  margin-bottom: 12px;
+  color: var(--text-dark);
+}
+
+.service-card p {
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  line-height: 1.6;
+  font-size: clamp(14px, 1.2vw, 16px);
+}
+
+.service-card a {
+  margin-top: auto;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.service-card a:hover {
+  text-decoration: underline;
+}
+
+
+/* HOVER LIFT + GLOW */
+.benefit-card:hover {
+  transform: scale(1.04) !important;
+  box-shadow:
+    0 20px 40px rgba(14, 165, 183, 0.25),
+    0 0 0 1px rgba(14, 165, 183, 0.25);
+  background: #ffffff;
+
+
+}
+
+/* subtle glow */
+.benefit-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at top,
+    rgba(14, 165, 183, 0.15),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+
+}
+
+.benefit-card:hover::after {
+  opacity: 1;
+  
+}
+
+/* =========================
+   ANIMATION
+========================= */
+
+@keyframes fadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* =========================
+   BREAKPOINTS
+========================= */
+
+@media (max-width: 1024px) {
+  .services {
+    padding: clamp(48px, 6vw, 72px) clamp(20px, 5vw, 48px);
+  }
+
+  .service-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(16px, 3vw, 24px);
+  }
+
+  .services h2 {
+    font-size: clamp(24px, 5vw, 32px);
+    margin-bottom: clamp(32px, 5vw, 40px);
+  }
+}
+
+@media (max-width: 768px) {
+  .services {
+    padding: clamp(40px, 5vw, 60px) clamp(16px, 4vw, 32px);
+  }
+
+  .service-grid {
+    grid-template-columns: 1fr;
+    gap: clamp(16px, 3vw, 24px);
+  }
+
+  .service-card {
+    padding: clamp(20px, 4vw, 28px);
+  }
+
+  .service-card h3 {
+    font-size: 18px;
+  }
+
+  .service-card p {
+    font-size: clamp(13px, 3vw, 15px);
+  }
+
+}
+
+
+
+
+@media (max-width: 480px) {
+  .services {
+    padding: clamp(32px, 4vw, 48px) clamp(12px, 3vw, 24px);
+  }
+
+  .services h2 {
+    font-size: clamp(20px, 6vw, 28px);
+    margin-bottom: clamp(24px, 4vw, 32px);
+  }
+
+  .service-grid {
+    gap: clamp(12px, 2vw, 16px);
+  }
+
+  .service-card {
+    padding: clamp(16px, 3vw, 24px);
+  }
+
+  .service-card h3 {
+    font-size: 16px;
+  }
+
+  .service-card p {
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .services {
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+}

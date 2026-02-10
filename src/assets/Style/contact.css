@@ -1,0 +1,372 @@
+/* =========================
+   CONTACT SECTION
+========================= */
+
+.contact {
+  padding: clamp(72px, 8vw, 96px) clamp(24px, 6vw, 72px);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(48px, 6vw, 72px);
+  background: var(--primary);
+  color: white;
+  align-items: center;
+}
+
+/* LEFT SIDE */
+.contact-info {
+  max-width: 520px;
+}
+
+.contact h2 {
+  font-size: clamp(32px, 5vw, 44px);
+  line-height: 1.2;
+  margin-bottom: 24px;
+}
+
+.contact-info p {
+  color: #e0f7fa;
+  line-height: 1.7;
+  margin-bottom: 28px;
+  max-width: 460px;
+  font-size: clamp(15px, 1.5vw, 16px);
+}
+.containerSection-tag {
+  
+  width: 140px;
+  height: 30px;
+  background-color: #529ec7;
+  display: inline-block;
+  padding: 2px 12px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #fff;
+}
+
+.containerSection-tag .section-tag {
+  color: #fff;
+}
+/* CONTACT DETAILS */
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 18px;
+  font-weight: 500;
+}
+
+.contact-icon {
+  
+  min-width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  border-radius: 12px;
+}
+
+/* =========================
+   RIGHT SIDE FORM
+========================= */
+
+.contact-form {
+  background: white;
+  border-radius: 28px;
+  padding: clamp(32px, 5vw, 48px);
+  color: var(--text-dark);
+  box-shadow: 0 30px 80px rgba(229, 243, 252, 0.144);
+}
+
+/* UIVERSE FORM */
+.contact-form .form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 100%;
+  background-color: transparent;
+
+
+}
+
+/* TITLE */
+.contact-form .title {
+  font-size: 26px;
+  color: var(--primary);
+  font-weight: 600;
+  letter-spacing: -1px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 30px;
+}
+
+.contact-form .title::before,
+.contact-form .title::after {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  left: 0;
+  background-color: var(--primary);
+}
+
+.contact-form .title::after {
+  animation: pulse 1s linear infinite;
+}
+
+/* MESSAGE & SIGNIN */
+.contact-form .message,
+.contact-form .signin {
+  color: #64748b;
+  font-size: 14px;
+}
+
+.contact-form .signin {
+  text-align: center;
+}
+
+.contact-form .signin a {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.contact-form .signin a:hover {
+  text-decoration: underline;
+}
+
+/* FLEX ROW */
+.flex {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+/* LABEL & INPUT */
+.contact-form label {
+  position: relative;
+  width: 100%;
+}
+
+.contact-form label .input {
+  width: 100%;
+  padding: 20px 14px 12px; /* more top padding */
+  border-radius: 12px;
+  border: 1px solid #cacfd6;
+  font-size: 15px;
+  outline: none;
+  background: #ffffff;
+  color: rgb(0, 0, 0);
+}
+
+
+.contact-form label .input + span {
+  position: absolute;
+  left: 14px;
+  top: 16px;
+  color: #64748b;
+  font-size: 0.9em;
+  transition: 0.3s ease;
+  pointer-events: none;
+}
+
+/* FLOATING EFFECT */
+.contact-form label .input:focus + span,
+.contact-form label .input:valid + span {
+  top: 6px;
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--primary);
+}
+.contact-form input[type="number"]::-webkit-inner-spin-button,
+.contact-form input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* SUBMIT BUTTON */
+.contact-form .submit {
+  border: none;
+  background-color: var(--primary);
+  padding: 16px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.contact-form .submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(14, 165, 183, 0.35);
+}
+
+/* PULSE ANIMATION */
+@keyframes pulse {
+  from {
+    transform: scale(0.9);
+    opacity: 1;
+  }
+  to {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* =========================
+   TABLET
+========================= */
+
+@media (max-width: 1024px) {
+  .contact {
+    grid-template-columns: 1fr;
+    text-align: center;
+    padding: clamp(48px, 6vw, 72px) clamp(20px, 5vw, 48px);
+    gap: clamp(32px, 5vw, 48px);
+  }
+
+  .contact-info {
+    max-width: 100%;
+    margin: 0 auto;
+  }
+
+  .contact h2 {
+    font-size: clamp(24px, 5vw, 36px);
+  }
+
+  .contact-info p {
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .contact-item {
+    justify-content: center;
+  }
+
+  .flex {
+    flex-direction: column;
+  }
+}
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 768px) {
+  .contact {
+    padding: clamp(40px, 5vw, 60px) clamp(16px, 4vw, 32px);
+    gap: clamp(24px, 4vw, 32px);
+  }
+
+  .contact h2 {
+    font-size: clamp(20px, 5vw, 28px);
+  }
+
+  .contact-info p {
+    font-size: clamp(13px, 3vw, 15px);
+  }
+
+  .contact-form {
+    padding: clamp(24px, 4vw, 32px);
+  }
+
+  .contact-form .title {
+    font-size: 20px;
+  }
+
+  .contact-form label .input {
+    padding: 16px 12px 10px;
+    font-size: 14px;
+  }
+
+  .contact-form .submit {
+    padding: 12px;
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .contact {
+    padding: clamp(32px, 4vw, 48px) clamp(12px, 3vw, 24px);
+    gap: clamp(20px, 3vw, 24px);
+  }
+
+  .contact h2 {
+    font-size: clamp(18px, 6vw, 24px);
+    margin-bottom: 16px;
+  }
+
+  .contact-info p {
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .contact-item {
+    justify-content: flex-start;
+    flex-direction: row;
+    text-align: left;
+    margin-bottom: 12px;
+  }
+
+  .contact-icon {
+    min-width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .contact-form {
+    padding: clamp(20px, 3vw, 24px);
+  }
+
+  .contact-form .title {
+    font-size: 18px;
+    padding-left: 24px;
+  }
+
+  .contact-form .form {
+    gap: 12px;
+  }
+
+  .flex {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .contact-form label .input {
+    padding: 14px 10px 8px;
+    font-size: 13px;
+    border-radius: 8px;
+  }
+
+  .contact-form label .input + span {
+    left: 10px;
+    top: 12px;
+    font-size: 0.85em;
+  }
+
+  .contact-form label .input:focus + span,
+  .contact-form label .input:valid + span {
+    top: 4px;
+    font-size: 0.65em;
+  }
+
+  .contact-form .submit {
+    padding: 10px;
+    font-size: 13px;
+    margin-top: 6px;
+  }
+}
+
+/* =========================
+   ULTRA-WIDE
+========================= */
+
+@media (min-width: 1600px) {
+  .contact {
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+}
