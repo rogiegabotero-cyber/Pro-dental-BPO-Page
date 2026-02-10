@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { FaHome } from "react-icons/fa";
 import { FaBars, FaTimes } from "react-icons/fa";
-import dental_logo from "../assets/Image/1.png";
-import dental_logo2 from "../assets/Image/2.png";
+import dental_logo from "../assets/Image/1.webp";
+import dental_logo2 from "../assets/Image/2.webp";
 import "../assets/Style/navbar.css";
 
 export default function Navbar() {
