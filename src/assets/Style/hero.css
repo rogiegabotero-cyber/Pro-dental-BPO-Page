@@ -303,3 +303,35 @@
     transform: scale(0.95);
   }
 }
+
+.hero-benefits {
+  list-style: none;
+  padding: 0;
+  margin: 20px 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.hero-benefits li {
+  position: relative;
+  padding-left: 28px;
+}
+
+.hero-benefits li::before {
+  content: "✔";
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #00a1b7;
+  font-weight: 700;
+}
+
+.benefit-sub {
+  display: block;
+  font-size: 0.9rem;
+  opacity: 0.75;
+  margin-top: 2px;
+}

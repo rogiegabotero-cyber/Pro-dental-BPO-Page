@@ -9,7 +9,7 @@ export default function Reviews() {
         if (entry.isIntersecting) {
           entry.target.classList.add("show");
         } else {
-          entry.target.classList.remove("show"); // replay on scroll
+          entry.target.classList.remove("show");
         }
       },
       { threshold: 0.25 }
@@ -61,6 +61,16 @@ export default function Reviews() {
           </div>
           <p>
             24/7 service availability for appointment scheduling and inquiries.
+          </p>
+        </div>
+
+        <div className="benefit-card fade-up benefit-highlight">
+          <div className="benefit-sents">
+            <strong>Improved Cashflow</strong>
+          </div>
+          <p>
+            Accurate and faster filing ensures payments are received sooner —
+            that’s liquid capital to cover overhead, salaries, and equipment.
           </p>
         </div>
       </div>

@@ -27,6 +27,13 @@
 
 }
 
+/* Make react-router Link look like the nav text */
+.nav-links .nav-link {
+  color: inherit;
+  text-decoration: none;
+  display: inline-block;
+}
+
 .nav-logo {
   display: flex;
   align-items: center;

@@ -5,6 +5,7 @@
 @import url(../src/assets/Style/hero.css);
 @import url(../src/assets/Style/review.css);
 @import url(../src/assets/Style/contact.css);
+@import url(../src/assets/Style/faq.css);
 
 @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
@@ -54,7 +55,14 @@ button {
   margin-bottom: 12px;
 }
 
-.services, .contact, .about, .reviews {
+.services {
   scroll-margin-top: 4.2rem; 
 }
 
+.about, .reviews, .contact {
+  scroll-margin-top: 2rem; 
+}
+
+.faqv2 {
+  scroll-margin-top: 8rem; 
+}

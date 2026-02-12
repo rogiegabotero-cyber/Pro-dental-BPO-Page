@@ -37,7 +37,7 @@ export default function Contact() {
         <div className="containerSection-tag">
         <span className="section-tag">Get In Touch</span>
         </div>
-        <h2>Ready to Transform Your Smile?</h2>
+        <h2>Try Pro-Dental BPO: Because Revenue Cycle Management shouldn't feel like pulling teeth.</h2>
         <p>
           Schedule your appointment today and take the first step
           towards a healthier smile.
@@ -70,7 +70,7 @@ export default function Contact() {
       {/* RIGHT SIDE FORM */}
       <div className="contact-form animate-right">
         <form className="form">
-          <p className="title">Book Appointment</p>
+          <p className="title">Consult</p>
 
           <div className="flex">
             <label>

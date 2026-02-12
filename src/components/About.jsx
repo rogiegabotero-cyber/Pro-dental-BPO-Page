@@ -13,9 +13,7 @@ export default function About() {
           entry.target.classList.remove("show"); // replay animation on scroll
         }
       },
-      {
-        threshold: 0.25,
-      }
+      { threshold: 0.25 }
     );
 
     if (aboutRef.current) observer.observe(aboutRef.current);
@@ -26,24 +24,34 @@ export default function About() {
   return (
     <section className="about" id="about" ref={aboutRef}>
       <div className="about-image fade-left">
-        <img src={den_love} alt="Dental team" />
+        <img src={den_love} alt="Pro-Dental BPO Operations Team" />
       </div>
 
       <div className="about-text fade-right">
-        <span className="section-tag">About Our Practice</span>
-        <h2>Dedicated to Your Dental Health</h2>
+        <span className="section-tag">Pro-Dental BPO</span>
+        <h2>Strategic Evolution in Dental Practice Management</h2>
 
         <p>
-          Dental Business Process Outsourcing (BPO) involves contracting non-clinical,
-          administrative tasks—such as billing, insurance verification, patient
-          scheduling, and call center support—to specialized third-party providers.
+          Pro-Dental BPO is a strategic evolution in Dental Practice Management,
+          founded in 2025 by <strong>Dr. Arnold Paulos, DDS MAGD</strong>.
+          Drawing on 35 years of frontline industry experience, Dr. Paulos has
+          navigated the full spectrum of practice growth while witnessing the
+          rising challenges of labor costs, staff burnout, and revenue leakage
+          from aging accounts receivable.
         </p>
 
-        <ul>
-          <li>✔ Flexible hours</li>
-          <li>✔ Insurance friendly</li>
-          <li>✔ Experienced professionals</li>
-        </ul>
+        <p>
+          Pro-Dental BPO bridges the gap between clinical expertise and advanced
+          automation, empowering practitioners to optimize operations and reclaim
+          their revenue cycles. Our dentist-designed integration is engineered to
+          streamline workflows and recover lost capital.
+        </p>
+
+        <p>
+          By providing the essential bandwidth through independent suites—
+          <strong>built for dentists, by a dentist</strong>—we allow you to focus on what
+          matters most: <strong>your patients.</strong>
+        </p>
       </div>
     </section>
   );
