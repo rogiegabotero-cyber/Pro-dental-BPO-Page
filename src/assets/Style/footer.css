@@ -1,8 +1,6 @@
 .footer {
   background: #0b1220;
   color: white;
-
- 
   padding: clamp(10px, 8vw, 10px) clamp(25px, 8vw, 10px);
 }
 
@@ -11,13 +9,11 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: clamp(32px, 6vw, 48px);
   padding: 1rem 0;
-  
 }
 
 .footer p {
   color: #94a3b8;
   line-height: 1.6;
-    min-width: 120%!important;
   font-size: 15px;
 }
 
