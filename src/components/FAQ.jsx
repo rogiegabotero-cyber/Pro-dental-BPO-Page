@@ -107,10 +107,8 @@ export default function FAQ() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [openId, setOpenId] = useState(null);
 
-  // ✅ Auto-scroll target
   const topRef = useRef(null);
 
-  // ✅ Auto-scroll when this page is shown (mount)
   useEffect(() => {
     requestAnimationFrame(() => {
       if (topRef.current) {
@@ -149,10 +147,8 @@ export default function FAQ() {
   return (
     <section id="faq" className="faqv2" ref={topRef}>
       <div className="faqv2__shell">
-        {/* HERO */}
         <header className="faqv2__hero">
           <div className="faqv2__heroCard">
-            <div className="faqv2__badge">Help Center</div>
             <h1 className="faqv2__title">FAQs</h1>
             <p className="faqv2__subtitle">
               Find quick answers about partnerships, services, onboarding, and
@@ -163,10 +159,16 @@ export default function FAQ() {
           <div className="faqv2__heroGlow" aria-hidden="true" />
         </header>
 
-        {/* LAYOUT */}
         <div className="faqv2__grid">
           {/* SIDEBAR */}
           <aside className="faqv2__side">
+            <div className="faqv2__tip">
+              <div className="faqv2__tipTitle">Tip</div>
+              <div className="faqv2__tipBody">
+                Try searching “billing” or “onboarding” to jump straight to the
+                most relevant answers.
+              </div>
+            </div>
             <div className="faqv2__panel">
               <div className="faqv2__search">
                 <span className="faqv2__searchIcon" aria-hidden="true">
@@ -180,19 +182,7 @@ export default function FAQ() {
                   aria-label="Search FAQs"
                 />
               </div>
-
-              <div className="faqv2__stats">
-                <div className="faqv2__stat">
-                  <div className="faqv2__statNum">{filtered.length}</div>
-                  <div className="faqv2__statLabel">Results</div>
-                </div>
-                <div className="faqv2__stat">
-                  <div className="faqv2__statNum">{FAQ_DATA.length}</div>
-                  <div className="faqv2__statLabel">Total FAQs</div>
-                </div>
-              </div>
-
-              {/* Desktop categories (buttons) */}
+              
                 <div className="faqv2__cats faqv2__cats--desktop" role="tablist" aria-label="FAQ categories">
                 {categories.map((cat) => (
                     <button
@@ -212,7 +202,6 @@ export default function FAQ() {
                 ))}
                 </div>
 
-                {/* Mobile category filter (icon + select) */}
                 <div className="faqv2__catsMobile" aria-label="FAQ category filter">
                 <label className="faqv2__filterLabel" htmlFor="faqCategorySelect">
                     <span className="faqv2__filterIcon" aria-hidden="true">⎚</span>
@@ -255,17 +244,8 @@ export default function FAQ() {
                 </button>
               )}
             </div>
-
-            <div className="faqv2__tip">
-              <div className="faqv2__tipTitle">Tip</div>
-              <div className="faqv2__tipBody">
-                Try searching “billing” or “onboarding” to jump straight to the
-                most relevant answers.
-              </div>
-            </div>
           </aside>
 
-          {/* CONTENT */}
           <main className="faqv2__main">
             <div className="faqv2__topline">
               <div className="faqv2__crumb">
