@@ -3,30 +3,30 @@ import "../assets/Style/faq.css";
 
 const FAQ_DATA = [
   {
-    id: "what-is-pbo",
+    id: "what-is-BPO",
     category: "General",
-    question: "What is Pro-Dental PBO?",
+    question: "What is Pro-Dental BPO?",
     answer:
-      "Pro-Dental PBO is a professional practice support organization that helps dental offices streamline operations, strengthen patient experience, and grow sustainably—so clinicians can focus more on care and less on admin work.",
+      "Pro-Dental BPO is a professional practice support organization that helps dental offices streamline operations, strengthen patient experience, and grow sustainably—so clinicians can focus more on care and less on admin work.",
   },
   {
     id: "who-can-join",
     category: "General",
-    question: "Who can partner with Pro-Dental PBO?",
+    question: "Who can partner with Pro-Dental BPO?",
     answer:
       "Most commonly, independent dental practice owners who want operational support while maintaining clinical autonomy. Some partners are solo practices, while others are multi-location groups.",
   },
   {
     id: "clinical-control",
     category: "Partnership",
-    question: "Do I keep clinical autonomy if I partner with Pro-Dental PBO?",
+    question: "Do I keep clinical autonomy if I partner with Pro-Dental BPO?",
     answer:
-      "Yes. In most PBO models, clinical decisions remain with the dentist(s). Pro-Dental PBO supports the non-clinical side such as billing systems, HR processes, marketing support, training, and reporting.",
+      "Yes. In most BPO models, clinical decisions remain with the dentist(s). Pro-Dental BPO supports the non-clinical side such as billing systems, HR processes, marketing support, training, and reporting.",
   },
   {
     id: "services-included",
     category: "Services",
-    question: "What services does Pro-Dental PBO provide to partner practices?",
+    question: "What services does Pro-Dental BPO provide to partner practices?",
     answer:
       "Common support areas include revenue cycle support, accounting/finance reporting, HR and recruiting support, operational playbooks, vendor negotiations, marketing assistance, and performance dashboards. Exact support depends on the partnership setup.",
   },
@@ -35,68 +35,68 @@ const FAQ_DATA = [
     category: "Onboarding",
     question: "How long does onboarding typically take?",
     answer:
-      "Onboarding timelines vary by practice size and systems. Many practices see an initial onboarding phase over several weeks, followed by optimization improvements over the next few months.",
+      "As the Employer of Record  Pro-Dental BPO will manage the entire Talent Management process, from hiring and training to payroll, taxes and compliance. Eliminate all the headaches of dealing with labor compliance, overtime, benefits, etc.  Think of Pro-Dental BPO as a 'Back-office staffing' agency that places well-trained agents to perform your back office function. Ultimately, this means your practice can focus on what matters most: patient care, allowing us to handle the heavy lifting on the backend.",
   },
   {
     id: "fees-and-structure",
     category: "Partnership",
-    question: "How does the partnership structure usually work?",
+    question: "What is EOR (Employer of Record)",
     answer:
-      "Structures vary (service agreement, management support, equity partnership, etc.). The best approach depends on practice goals, desired support depth, and growth plans. Pro-Dental PBO typically aligns incentives around long-term practice health.",
+      "Structures vary (service agreement, management support, equity partnership, etc.). The best approach depends on practice goals, desired support depth, and growth plans. Pro-Dental BPO typically aligns incentives around long-term practice health.",
   },
   {
     id: "tech",
     category: "Technology",
-    question: "Does Pro-Dental PBO require us to change our software?",
+    question: "Does Pro-Dental BPO require us to change our software?",
     answer:
-      "Not always. Some practices keep existing systems, while others choose to migrate to standardized tools for better reporting and workflows. If changes happen, they’re planned to minimize disruption.",
+      "Keep existing systems, while others choose to migrate to standardized tools for better reporting and workflows. If changes happen, they’re planned to minimize disruption.",
   },
   {
     id: "marketing",
     category: "Services",
-    question: "Can Pro-Dental PBO help with marketing and new patient growth?",
+    question: "Can Pro-Dental BPO help with marketing and new patient growth?",
     answer:
-      "Yes—support often includes digital presence improvements, local SEO guidance, campaign planning, reputation management, and tracking metrics so growth is measurable and sustainable.",
+      "Yes. As your premier BPO partner we can recruit talents in the US and abroad. Giving you full access to a Global talent pool. We can also help you deploy tech like Human Capital Management System to assist in managing talents and scale projects ",
   },
   {
     id: "staffing",
     category: "Operations",
-    question: "Can Pro-Dental PBO help with staffing and hiring?",
+    question: "How can Pro-Dental BPO help you save costs? (instead of 'how can a PBO partnership reduce costs?)",
     answer:
-      "Yes. Many PBO support models include recruiting process support, onboarding templates, training resources, and retention strategies to help stabilize staffing.",
+      "Pro-Dental BPO slashes overhead by moving administrative tasks to our specialized remote teams, freeing your staff to focus on clinical excellence and production. More importantly Pro-Dental BPO will improve your ROI by shortening your Revenue Cycle Management and in the long run allowing your practice to become cashflow-positive.",
   },
   {
     id: "cost-savings",
     category: "Operations",
-    question: "How can a PBO partnership reduce costs?",
+    question: "How can a BPO partnership reduce costs?",
     answer:
       "Cost reductions often come from vendor negotiation, better procurement, process efficiencies, improved scheduling and recall systems, and cleaner revenue cycle workflows (reducing write-offs and delays).",
   },
   {
     id: "insurance",
     category: "Billing",
-    question: "Does Pro-Dental PBO help with insurance and billing?",
+    question: "Does Pro-Dental BPO help with insurance and billing?",
     answer:
       "Often yes—support can include insurance verification workflows, claims submission processes, denial management, reporting, and training so collections become more consistent.",
   },
   {
     id: "multi-location",
     category: "Growth",
-    question: "Can Pro-Dental PBO help me expand to multiple locations?",
+    question: "Can Pro-Dental BPO help me expand to multiple locations?",
     answer:
       "Yes. Partners often benefit from standardized operations, KPI tracking, leadership training, and site-launch playbooks that make growth more repeatable.",
   },
   {
     id: "patient-experience",
     category: "Operations",
-    question: "How does a PBO partnership affect patient experience?",
+    question: "How does a BPO partnership affect patient experience?",
     answer:
-      "Ideally it improves consistency and service: smoother scheduling, clearer billing, stronger follow-up, and better-trained front desk processes—while clinicians stay focused on patient care.",
+      "It improves consistency and service: smoother scheduling, clearer billing, stronger follow-up, and better-trained front desk processes—while clinicians stay focused on patient care.",
   },
   {
     id: "get-started",
     category: "Onboarding",
-    question: "How do we get started with Pro-Dental PBO?",
+    question: "How do we get started with Pro-Dental BPO?",
     answer:
       "Typically the first step is a discovery conversation to understand your practice goals, systems, and challenges, followed by a proposal outlining support areas and partnership structure.",
   },

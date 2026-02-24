@@ -45,17 +45,17 @@ export default function Contact() {
       <div className="icon-container"> 
         <div className="contact-item">
           <FaPhoneAlt className="contact-icon" />
-          <span>(844) 7592442</span>
+          <span>(844) 477-6336</span>
         </div>
         
         <div className="contact-item">
           <FaEnvelope className="contact-icon" />
           <span>info@prodental.com</span>
         </div>
-        <div className="contact-item">
+        {/* <div className="contact-item">
           <FaMapMarkerAlt className="contact-icon" />
           <span>123 Smile Street, Suite 100</span>
-        </div>
+        </div> */}
         
        
         
