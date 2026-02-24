@@ -45,16 +45,16 @@ export default function Footer() {
       <h4>Contact</h4> 
       <div className="contact-item1">
         <FaPhoneAlt className="contact-icon2" />
-        <p>(555) 123-4567</p>
+        <p>(844) 7592442</p>
       </div>
       <div className="contact-item1">
         <FaEnvelope className="contact-icon2" />
         <p>info@prodental.com</p>
       </div>
-      <div className="contact-item1">
+      {/* <div className="contact-item1">
         <FaMapMarkerAlt className="contact-icon2" />
         <p>123 Smile Street, Suite 100</p>
-      </div>
+      </div> */}
     </div>
       
     <div className="card">
