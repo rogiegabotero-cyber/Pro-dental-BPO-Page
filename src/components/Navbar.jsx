@@ -147,11 +147,11 @@ export default function Navbar() {
           </Link>
         </li>
 
-        <li className="cont" onClick={() => setOpen(false)}>
+        {/* <li className="cont" onClick={() => setOpen(false)}>
           <a href="#" onClick={(e) => e.preventDefault()}>
             Client Portal
           </a>
-        </li>
+        </li> */}
 
         <button
           className="btn-primary mobile-btn"
