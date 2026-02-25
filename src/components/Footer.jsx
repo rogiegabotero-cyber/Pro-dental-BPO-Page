@@ -1,20 +1,33 @@
-import dent_logo from "../assets/Image/1.webp"
-import dent_logo2 from "../assets/Image/2.webp"
-import {
-  FaPhoneAlt,
-  FaMapMarkerAlt,
-  FaEnvelope,
-  FaFacebookF
-} from "react-icons/fa";
+import dent_logo from "../assets/Image/1.webp";
+import dent_logo2 from "../assets/Image/2.webp";
+import { FaPhoneAlt, FaEnvelope } from "react-icons/fa";
+import { useLocation, useNavigate } from "react-router-dom";
 
 export default function Footer() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  // Route-aware scroll helper (same idea as Navbar)
   const scrollToSection = (id) => {
-    const section = document.getElementById(id);
-    if (section) {
-      section.scrollIntoView({ behavior: "smooth" });
+    const doScroll = () => {
+      const section = document.getElementById(id);
+      if (section) section.scrollIntoView({ behavior: "smooth" });
+    };
+
+    // If not on homepage, go home first then scroll
+    if (location.pathname !== "/") {
+      navigate("/");
+      setTimeout(doScroll, 50); // wait for home sections to mount
+      return;
     }
+
+    doScroll();
   };
 
+  const goToFaq = () => {
+    navigate("/faq");
+  };
+  
   return (
 <footer className="footer">
   <div className="footer-grid">
@@ -38,6 +51,8 @@ export default function Footer() {
       <p onClick={() => scrollToSection("services")}>Services</p>
       <p onClick={() => scrollToSection("about")}>About</p>
       <p onClick={() => scrollToSection("reviews")}>Benefits</p>
+      <p onClick={() => scrollToSection("contact")}>Contact</p>
+      <p onClick={goToFaq}>FAQ</p>
 
     </div>
 

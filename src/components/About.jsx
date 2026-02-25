@@ -32,12 +32,11 @@ export default function About() {
         <h2>Strategic Evolution in Dental Practice Management</h2>
 
         <p>
-          Pro-Dental BPO is a strategic evolution in Dental Practice Management,
-          founded in 2025 by <strong>Dr. Arnold Paulos, DDS MAGD</strong>.
-          Drawing on 35 years of frontline industry experience, Dr. Paulos has
-          navigated the full spectrum of practice growth while witnessing the
-          rising challenges of labor costs, staff burnout, and revenue leakage
-          from aging accounts receivable.
+          Pro-Dental BPO is a strategic evolution in Dental Practice Management. 
+          Drawing on 35 years of frontline industry experience, <strong>Dr. Arnold Paulos, 
+          DDS MAGD</strong> has navigated the full spectrum of practice growth while witnessing 
+          the rising challenges of labor costs, staff burnout, and revenue leakage from 
+          aging accounts receivable.
         </p>
 
         <p>
