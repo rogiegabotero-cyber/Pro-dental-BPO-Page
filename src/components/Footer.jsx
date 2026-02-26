@@ -60,7 +60,7 @@ export default function Footer() {
       <h4>Contact</h4> 
       <div className="contact-item1">
         <FaPhoneAlt className="contact-icon2" />
-        <p>(844) 7592442</p>
+        <p>(844) 477-6336</p>
       </div>
       <div className="contact-item1">
         <FaEnvelope className="contact-icon2" />
