@@ -1,16 +1,29 @@
-import { useState, useEffect, useRef } from "react";
-import { FaHome } from "react-icons/fa";
-import { FaBars, FaTimes } from "react-icons/fa";
+import { useEffect, useRef, useState } from "react";
+import {
+  FaBars,
+  FaChevronDown,
+  FaCog,
+  FaHome,
+  FaSignOutAlt,
+  FaTachometerAlt,
+  FaTimes,
+} from "react-icons/fa";
 import dental_logo from "../assets/Image/1.webp";
 import dental_logo2 from "../assets/Image/2.webp";
+import LogoutConfirmModal from "./LogoutConfirmModal";
 import "../assets/Style/navbar.css";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/useAuth";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimeout = useRef(null);
+  const profileRef = useRef(null);
   const [activeSection, setActiveSection] = useState("");
+  const { user, logout, isAdmin, isOwner } = useAuth();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -29,6 +42,32 @@ export default function Navbar() {
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setProfileOpen(false);
+      }
+    };
+
+    const handleEscape = (event) => {
+      if (event.key === "Escape") {
+        setProfileOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
+    setProfileOpen(false);
+  }, [location.pathname]);
 
   // Route-aware scroll helper
   const scrollToSection = (id) => {
@@ -63,11 +102,57 @@ export default function Navbar() {
     goTop();
   };
 
+  const handleSignIn = () => {
+    navigate("/login", {
+      state: {
+        from: {
+          pathname: location.pathname,
+          search: location.search,
+        },
+      },
+    });
+    setOpen(false);
+    setProfileOpen(false);
+  };
+
+  const handleProfileToggle = () => {
+    if (!user) {
+      handleSignIn();
+      return;
+    }
+
+    setProfileOpen((current) => !current);
+  };
+
+  const handleSettings = () => {
+    navigate(isAdmin ? "/admin/settings" : "/settings");
+    setProfileOpen(false);
+    setOpen(false);
+  };
+
+  const handleAdminPanel = () => {
+    navigate("/admin");
+    setProfileOpen(false);
+    setOpen(false);
+  };
+
+  const openLogoutConfirm = () => {
+    setProfileOpen(false);
+    setOpen(false);
+    setLogoutOpen(true);
+  };
+
+  const handleLogout = async () => {
+    setLogoutOpen(false);
+    await logout();
+    navigate("/login", { replace: true });
+  };
+
   // Only observe sections on homepage (prevents weird behavior on /faq)
   useEffect(() => {
     if (location.pathname !== "/") return;
 
-    const sections = ["services", "about", "reviews", "contact"];
+    const sections = ["services", "about", "reviews", "articles", "contact"];
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -131,6 +216,15 @@ export default function Navbar() {
 
         <li
           className={`cont ${
+            location.pathname === "/" && activeSection === "articles" ? "active" : ""
+          }`}
+          onClick={() => scrollToSection("articles")}
+        >
+          Articles
+        </li>
+
+        <li
+          className={`cont ${
             location.pathname === "/" && activeSection === "contact" ? "active" : ""
           }`}
           onClick={() => scrollToSection("contact")}
@@ -165,9 +259,97 @@ export default function Navbar() {
         {open ? <FaTimes /> : <FaBars />}
       </button>
 
-      <button className="slice" onClick={() => scrollToSection("contact")}>
-        <span className="text">Consult</span>
-      </button>
+      <div className="nav-actions">
+        <button className="slice" onClick={() => scrollToSection("contact")}>
+          <span className="text">Schedule Consultation</span>
+        </button>
+
+        <div
+          className={`profile-wrapper ${profileOpen ? "profile-wrapper--open" : ""}`}
+          ref={profileRef}
+        >
+          <button
+            className={`client-auth ${user ? "client-auth--signed-in" : ""}`}
+            type="button"
+            onClick={handleProfileToggle}
+            title={user ? user.email : "Sign in"}
+            aria-label={user ? `Signed in as ${user.displayName || user.email}` : "Sign in"}
+            aria-haspopup={user ? "menu" : undefined}
+            aria-expanded={user ? profileOpen : undefined}
+          >
+            {user?.photoURL ? (
+              <img
+                className="client-auth__avatar"
+                src={user.photoURL}
+                alt={user.displayName || "Google profile"}
+              />
+            ) : user ? (
+              <span className="client-auth__avatar client-auth__avatar--initial">
+                {(user.displayName || user.email || "G").charAt(0).toUpperCase()}
+              </span>
+            ) : (
+              "Sign in"
+            )}
+            {user && <FaChevronDown className="client-auth__chevron" aria-hidden="true" />}
+          </button>
+
+          {user && profileOpen && (
+            <div className="profile-dropdown" role="menu" aria-label="Account options">
+              <div className="profile-dropdown__header">
+                <div className="profile-dropdown__avatar">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt="" />
+                  ) : (
+                    <span>{(user.displayName || user.email || "G").charAt(0).toUpperCase()}</span>
+                  )}
+                </div>
+                <div className="profile-dropdown__user">
+                  <strong className="profile-dropdown__name">
+                    {user.displayName || "Signed in"}
+                  </strong>
+                  <span className="profile-dropdown__email">{user.email}</span>
+                </div>
+              </div>
+
+              <div className="profile-dropdown__divider" />
+
+              <div className="profile-dropdown__items">
+                {(isAdmin || isOwner) && (
+                  <button
+                    type="button"
+                    className="profile-dropdown__item"
+                    onClick={handleAdminPanel}
+                  >
+                    <FaTachometerAlt className="profile-dropdown__icon" aria-hidden="true" />
+                    <span>Admin Panel</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="profile-dropdown__item"
+                  onClick={handleSettings}
+                >
+                  <FaCog className="profile-dropdown__icon" aria-hidden="true" />
+                  <span>Settings</span>
+                </button>
+                <button
+                  type="button"
+                  className="profile-dropdown__item profile-dropdown__item--logout"
+                  onClick={openLogoutConfirm}
+                >
+                  <FaSignOutAlt className="profile-dropdown__icon" aria-hidden="true" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+      <LogoutConfirmModal
+        isOpen={logoutOpen}
+        onCancel={() => setLogoutOpen(false)}
+        onConfirm={handleLogout}
+      />
     </nav>
   );
 }

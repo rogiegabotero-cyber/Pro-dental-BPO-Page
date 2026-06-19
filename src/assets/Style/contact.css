@@ -158,7 +158,8 @@
   font-size: 15px;
   outline: none;
   background: #ffffff;
-  color: rgb(0, 0, 0);
+  color: #000000;
+  -webkit-text-fill-color: #000000;
 }
 
 
@@ -202,6 +203,72 @@
 .contact-form .submit:hover {
   transform: translateY(-1px);
   box-shadow: 0 12px 30px rgba(14, 165, 183, 0.35);
+}
+
+.contact-form .submit:disabled,
+.contact-form .submit:disabled:hover {
+  cursor: not-allowed;
+  opacity: 0.7;
+  transform: none;
+  box-shadow: none;
+}
+
+.contact-form .form-status {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.contact-form .form-status-success {
+  color: #0f766e;
+}
+
+.contact-form .form-status-error {
+  color: #b91c1c;
+}
+
+/* ===== DATE INPUT FIX ===== */
+
+.select-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+/* Make sure date text doesn't collide with label */
+.select-wrapper input[type="date"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  z-index: 1;
+}
+
+/* Default label position */
+.select-wrapper span {
+  position: absolute;
+  left: 14px;
+  top: 16px;
+  color: #64748b;
+  font-size: 0.9em;
+  transition: 0.3s ease;
+  pointer-events: none;
+  background: white;
+  padding: 0 4px;
+}
+
+/* Float when focused */
+.select-wrapper input:focus + span {
+  top: 6px;
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+/* Float when date has value */
+.select-wrapper.has-value span {
+  top: 6px;
+  font-size: 0.7em;
+  font-weight: 600;
+  color: var(--primary);
 }
 
 /* PULSE ANIMATION */

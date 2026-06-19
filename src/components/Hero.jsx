@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import Smile_love from "../assets/Image/deent.webp";
 import HeroBgImage from "../assets/Image/3.webp";
+import { defaultHeroContent } from "../data/defaultContent";
+import { useCmsDocument } from "../hooks/useCmsData";
 
 export default function Hero() {
   const heroRef = useRef(null);
   const [inView, setInView] = useState(false);
   const [hasViewed, setHasViewed] = useState(false);
+  const { data: hero } = useCmsDocument("hero", defaultHeroContent);
 
-  // Enter/Exit animation trigger
   useEffect(() => {
     const el = heroRef.current;
     if (!el) return;
@@ -28,7 +30,6 @@ export default function Hero() {
     return () => observer.disconnect();
   }, []);
 
-  // Parallax background
   useEffect(() => {
     const handleScroll = () => {
       const offset = window.scrollY * 0.15;
@@ -55,29 +56,22 @@ export default function Hero() {
       >
         <div
           className="hero-bg"
-          style={{ backgroundImage: `url(${HeroBgImage})` }}
+          style={{
+            backgroundImage: `url(${hero.backgroundImageUrl || HeroBgImage})`,
+          }}
         />
 
         <div className="hero-text">
           <div className="containerHero-section-tag">
-            <span className="hero-tag">Pro-Dental BPO</span>
+            <span className="hero-tag">{hero.tag}</span>
           </div>
 
-          <h1>
-            Why Hire <br />
-            Pro-Dental BPO
-          </h1>
+          <h1>{hero.title}</h1>
 
           <ul className="hero-benefits">
-            <li>Save 60% in Labor Costs</li>
-            <li>Scale On Demand</li>
-            <li>
-              Access to Entire Back-Office Support Suites
-              <span className="benefit-sub">
-                (Marketing, Accounting, IT, AI / Automation)
-              </span>
-            </li>
-            <li>Access to Global Talent Pool (Nearshore / Offshore)</li>
+            {(hero.benefits || []).map((benefit) => (
+              <li key={benefit}>{benefit}</li>
+            ))}
           </ul>
 
           <div className="hero-buttons">
@@ -85,24 +79,25 @@ export default function Hero() {
               className="btn-primary"
               onClick={() => scrollToSection("contact")}
             >
-              Consult →
+              {hero.primaryButtonLabel}
             </button>
 
             <button
               className="btn-outline"
               onClick={() => scrollToSection("services")}
             >
-              Explore Services
+              {hero.secondaryButtonLabel}
             </button>
           </div>
         </div>
 
         <div className="hero-image">
-          <div className="card">
             <div className="card2 image-box">
-              <img src={Smile_love} alt="Pro-Dental BPO Support Team" />
+              <img
+                src={hero.foregroundImageUrl || Smile_love}
+                alt={hero.foregroundImageAlt || "Pro-Dental BPO Support Team"}
+              />
             </div>
-          </div>
         </div>
       </section>
     </div>

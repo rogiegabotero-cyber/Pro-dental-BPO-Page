@@ -1,0 +1,44 @@
+.client-preview-eye {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 9999;
+  display: flex;
+  place-items: center;
+  border: 0;
+  border-radius: 50px;
+  background: transparent;
+  color: #0b8f9e;
+  box-shadow: none;
+  font-size: 20px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  padding: 10px;
+}
+
+.client-preview-eye:hover {
+  transform: translateY(-2px);
+  background: #00000038;
+  box-shadow: none;
+}
+
+.client-preview-eye:focus,
+.client-preview-eye:active,
+.client-preview-eye:focus-visible {
+  outline: none;
+  box-shadow: none;
+  border: none;
+  background: transparent;
+}
+
+.client-preview-eye::-moz-focus-inner {
+  border: 0;
+}
+
+@media (max-width: 640px) {
+  .client-preview-eye {
+    right: 16px;
+    bottom: 16px;
+    width: 48px;
+    height: 48px;
+  }
+}

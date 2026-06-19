@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 import den_love from "../assets/Image/den.webp";
+import { defaultAboutContent } from "../data/defaultContent";
+import { useCmsDocument } from "../hooks/useCmsData";
 
 export default function About() {
   const aboutRef = useRef(null);
+  const { data: about } = useCmsDocument("about", defaultAboutContent);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -10,7 +13,7 @@ export default function About() {
         if (entry.isIntersecting) {
           entry.target.classList.add("show");
         } else {
-          entry.target.classList.remove("show"); // replay animation on scroll
+          entry.target.classList.remove("show");
         }
       },
       { threshold: 0.25 }
@@ -24,33 +27,19 @@ export default function About() {
   return (
     <section className="about" id="about" ref={aboutRef}>
       <div className="about-image fade-left">
-        <img src={den_love} alt="Pro-Dental BPO Operations Team" />
+        <img
+          src={about.imageUrl || den_love}
+          alt={about.imageAlt || "Pro-Dental BPO Operations Team"}
+        />
       </div>
 
       <div className="about-text fade-right">
-        <span className="section-tag">Pro-Dental BPO</span>
-        <h2>Strategic Evolution in Dental Practice Management</h2>
+        <span className="section-tag">{about.tag}</span>
+        <h2>{about.title}</h2>
 
-        <p>
-          Pro-Dental BPO is a strategic evolution in Dental Practice Management. 
-          Drawing on 35 years of frontline industry experience, <strong>Dr. Arnold Paulos, 
-          DDS MAGD</strong> has navigated the full spectrum of practice growth while witnessing 
-          the rising challenges of labor costs, staff burnout, and revenue leakage from 
-          aging accounts receivable.
-        </p>
-
-        <p>
-          Pro-Dental BPO bridges the gap between clinical expertise and advanced
-          automation, empowering practitioners to optimize operations and reclaim
-          their revenue cycles. Our dentist-designed integration is engineered to
-          streamline workflows and recover lost capital.
-        </p>
-
-        <p>
-          By providing the essential bandwidth through independent suites—
-          <strong>built for dentists, by a dentist</strong>—we allow you to focus on what
-          matters most: <strong>your patients.</strong>
-        </p>
+        {(about.paragraphs || []).map((paragraph) => (
+          <p key={paragraph}>{paragraph}</p>
+        ))}
       </div>
     </section>
   );
