@@ -12,6 +12,13 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
+import {
+  FaFacebookF,
+  FaGlobe,
+  FaInstagram,
+  FaLinkedinIn,
+  FaUserCircle,
+} from "react-icons/fa";
 import { db } from "../firebase";
 import NewsletterSignup from "./NewsletterSignup";
 import { useAuth } from "../auth/useAuth";
@@ -33,6 +40,13 @@ const timestampToMillis = (timestamp) => {
   if (timestamp?.toMillis) return timestamp.toMillis();
   if (timestamp?.toDate) return timestamp.toDate().getTime();
   return 0;
+};
+
+const normalizeOptionalUrl = (value = "") => {
+  const nextValue = String(value || "").trim();
+  if (!nextValue) return "";
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(nextValue)) return nextValue;
+  return `https://${nextValue}`;
 };
 
 const sortArticlesByPublishedAt = (articles) =>
@@ -131,11 +145,80 @@ function ArticleCard({ article }) {
         <img src={article.mediaUrl} alt={article.mediaAlt || article.title} />
       )}
       <div className="article-card__content">
-        <span>{formatDate(article.publishedAt)}</span>
+        <p className="article-card__published">
+          Published on {formatDate(article.publishedAt) || "the publication date"}
+        </p>
         <h2>{article.title}</h2>
+        {article.writerName && <p className="article-card__author">By {article.writerName}</p>}
         {summary && <p>{summary}</p>}
       </div>
     </article>
+  );
+}
+
+function ArticleWriterProfile({ article }) {
+  const writerName = String(article?.writerName || "").trim();
+  const writerTitle = String(article?.writerTitle || "").trim();
+  const writerBio = String(article?.writerBio || "").trim();
+  const writerPhotoUrl = String(article?.writerPhotoUrl || "").trim();
+  const writerPhotoAlt = String(article?.writerPhotoAlt || "").trim();
+  const socialLinks = [
+    {
+      label: "Instagram",
+      href: normalizeOptionalUrl(article?.writerInstagramUrl),
+      icon: FaInstagram,
+    },
+    {
+      label: "Facebook",
+      href: normalizeOptionalUrl(article?.writerFacebookUrl),
+      icon: FaFacebookF,
+    },
+    {
+      label: "LinkedIn",
+      href: normalizeOptionalUrl(article?.writerLinkedinUrl),
+      icon: FaLinkedinIn,
+    },
+    {
+      label: "Website",
+      href: normalizeOptionalUrl(article?.writerWebsiteUrl),
+      icon: FaGlobe,
+    },
+  ].filter((item) => item.href);
+
+  if (!writerName && !writerTitle && !writerBio && !writerPhotoUrl && socialLinks.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="article-writer-profile" aria-labelledby="writer-profile-title">
+      <div className="article-writer-profile__heading">
+        <span className="article-writer-profile__kicker">Writer profile</span>
+        <h2 id="writer-profile-title">{writerName || "About the writer"}</h2>
+        {writerTitle && <p className="article-writer-profile__title">{writerTitle}</p>}
+      </div>
+      <div className="article-writer-profile__body">
+        <div className="article-writer-profile__avatar">
+          {writerPhotoUrl ? (
+            <img src={writerPhotoUrl} alt={writerPhotoAlt || writerName || "Writer profile"} />
+          ) : (
+            <FaUserCircle aria-hidden="true" />
+          )}
+        </div>
+        <div className="article-writer-profile__copy">
+          {writerBio && <p>{writerBio}</p>}
+          {socialLinks.length > 0 && (
+            <div className="article-writer-profile__links">
+              {socialLinks.map((link) => (
+                <a key={link.label} href={link.href} target="_blank" rel="noreferrer">
+                  <link.icon aria-hidden="true" />
+                  <span>{link.label}</span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -539,7 +622,9 @@ export function ArticleDetail() {
       </Link>
 
       <header>
-        <span>{formatDate(article.publishedAt)}</span>
+        <p className="article-detail__published">
+          Published on {formatDate(article.publishedAt) || "the publication date"}
+        </p>
         <h1>{article.title}</h1>
         {article.excerpt && <p>{article.excerpt}</p>}
       </header>
@@ -558,6 +643,8 @@ export function ArticleDetail() {
           </div>
         </div>
       </div>
+
+      <ArticleWriterProfile article={article} />
 
       <NewsletterSignup />
     </article>

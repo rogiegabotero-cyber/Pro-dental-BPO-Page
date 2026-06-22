@@ -10,6 +10,7 @@ export default function FloatingClientPreview() {
   const navigate = useNavigate();
   const [clientPreview, setClientPreview] = useState(false);
   const isAdminRoute = location.pathname.startsWith("/admin");
+  const isArticlesRoute = location.pathname === "/admin/articles";
 
   if (loading || !isAdmin) return null;
 
@@ -26,7 +27,7 @@ export default function FloatingClientPreview() {
 
   return (
     <button
-      className="client-preview-eye"
+      className={`client-preview-eye${isArticlesRoute ? " client-preview-eye--articles" : ""}`}
       type="button"
       onClick={openClientPreview}
       aria-label="View client preview"

@@ -29,10 +29,11 @@ import {
   FaCog,
   FaChartLine,
   FaChartBar,
-  FaChartPie,
   FaEye,
   FaImage,
   FaLayerGroup,
+  FaChevronDown,
+  FaChevronUp,
   FaNewspaper,
   FaPen,
   FaPlus,
@@ -103,6 +104,15 @@ const blankArticle = {
   title: "",
   excerpt: "",
   body: "",
+  writerName: "",
+  writerTitle: "",
+  writerBio: "",
+  writerPhotoUrl: "",
+  writerPhotoAlt: "",
+  writerInstagramUrl: "",
+  writerFacebookUrl: "",
+  writerLinkedinUrl: "",
+  writerWebsiteUrl: "",
   mediaUrl: "",
   mediaAlt: "",
   mediaCaption: "",
@@ -111,6 +121,13 @@ const blankArticle = {
 };
 
 const normalizeEmail = (value = "") => String(value).trim().toLowerCase();
+
+const normalizeOptionalUrl = (value = "") => {
+  const nextValue = String(value || "").trim();
+  if (!nextValue) return "";
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(nextValue)) return nextValue;
+  return `https://${nextValue}`;
+};
 
 const stripHtmlTags = (value = "") =>
   String(value)
@@ -135,6 +152,13 @@ const getLocalDateIdFromDate = (date) => {
 
 const getLocalDateId = () => getLocalDateIdFromDate(new Date());
 
+const getStartOfWeek = (date = new Date()) => {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - start.getDay());
+  return start;
+};
+
 const getCurrentMonthDateIds = () => {
   const today = new Date();
   const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -155,6 +179,12 @@ const formatDashboardDateLabel = (dateId) => {
   const date = new Date(year, month - 1, day);
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
 };
+
+const formatTrafficTimeLabel = (date) =>
+  new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 
 const formatEngagementTimestamp = (timestamp) => {
   const date = timestamp?.toDate ? timestamp.toDate() : null;
@@ -182,17 +212,115 @@ const valuesByDateId = (items, key = "totalVisits") =>
     return lookup;
   }, new Map());
 
-const buildMonthlySeries = (items, key = "totalVisits") => {
+const buildDateRangeSeries = (items, startDate, endDate, key = "totalVisits") => {
   const counts = valuesByDateId(items, key);
+  const series = [];
+  const cursor = new Date(startDate);
+  const end = new Date(endDate);
 
-  return getCurrentMonthDateIds().map((id) => ({
-    id,
-    label: formatDashboardDateLabel(id),
-    value: counts.get(id) || 0,
-  }));
+  cursor.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  while (cursor <= end) {
+    const id = getLocalDateIdFromDate(cursor);
+    series.push({
+      id,
+      label: formatDashboardDateLabel(id),
+      value: counts.get(id) || 0,
+    });
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return series;
 };
 
-function DashboardGraphCard({ icon, title, subtitle, total, totalLabel, children, className = "" }) {
+const buildTrafficTimeSeries = (items, spanMinutes, bucketMinutes, labelFormatter) => {
+  const bucketCount = Math.max(1, Math.ceil(spanMinutes / bucketMinutes));
+  const bucketMs = bucketMinutes * 60 * 1000;
+  const nowMs = Date.now();
+  const startMs = nowMs - bucketCount * bucketMs;
+
+  return Array.from({ length: bucketCount }, (_, index) => {
+    const bucketStart = startMs + index * bucketMs;
+    return {
+      id: String(bucketStart),
+      start: bucketStart,
+      label: labelFormatter(new Date(bucketStart), index, bucketCount),
+      value: 0,
+    };
+  }).map((bucket, index, buckets) => {
+    const nextBucket = buckets[index + 1];
+    const bucketEnd = nextBucket ? nextBucket.start : nowMs + 1;
+    const value = items.reduce((count, item) => {
+      const timestamp = Number(item.capturedAtMs || item.createdAtMs || timestampToMillis(item.createdAt));
+      if (!Number.isFinite(timestamp) || timestamp < bucket.start || timestamp >= bucketEnd) {
+        return count;
+      }
+      return count + 1;
+    }, 0);
+
+    return {
+      id: bucket.id,
+      label: bucket.label,
+      value,
+    };
+  });
+};
+
+const TRAFFIC_RANGE_OPTIONS = [
+  { value: "month", label: "This month" },
+  { value: "week", label: "This week" },
+  { value: "24h", label: "Last 24 hours" },
+  { value: "60m", label: "Last 60 minutes" },
+];
+
+const CONSULTATION_STATUS_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "new", label: "New" },
+  { value: "contacted", label: "Contacted" },
+  { value: "archived", label: "Archived" },
+];
+
+const CONSULTATION_STATUS_LABELS = {
+  new: "New",
+  contacted: "Contacted",
+  archived: "Archived",
+};
+
+const getConsultationName = (item = {}) =>
+  item.fullName?.trim() ||
+  `${item.firstName || ""} ${item.lastName || ""}`.trim() ||
+  item.email ||
+  "Unnamed request";
+
+const getConsultationStatus = (item = {}) => {
+  const status = item.status || "new";
+  return CONSULTATION_STATUS_LABELS[status] ? status : "new";
+};
+
+const formatConsultationTimestamp = (timestamp) => {
+  const date = timestamp?.toDate ? timestamp.toDate() : null;
+  if (!date) return "Pending";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+};
+
+function DashboardGraphCard({
+  icon,
+  title,
+  subtitle,
+  total,
+  totalLabel,
+  actions,
+  children,
+  className = "",
+}) {
   return (
     <section className={`admin-graph-card ${className}`.trim()}>
       <div className="admin-graph-card__header">
@@ -205,9 +333,12 @@ function DashboardGraphCard({ icon, title, subtitle, total, totalLabel, children
             {subtitle && <p>{subtitle}</p>}
           </div>
         </div>
-        <div className="admin-graph-card__total">
-          <strong>{total}</strong>
-          {totalLabel && <span>{totalLabel}</span>}
+        <div className="admin-graph-card__header-actions">
+          {actions}
+          <div className="admin-graph-card__total">
+            <strong>{total}</strong>
+            {totalLabel && <span>{totalLabel}</span>}
+          </div>
         </div>
       </div>
       {children}
@@ -216,10 +347,10 @@ function DashboardGraphCard({ icon, title, subtitle, total, totalLabel, children
 }
 
 function TrendChart({ series }) {
-  const pointSpacing = 32;
-  const width = Math.max(640, series.length * pointSpacing + 42 + 18);
-  const height = 220;
-  const padding = { top: 18, right: 18, bottom: 42, left: 42 };
+  const pointSpacing = 18;
+  const width = Math.max(320, series.length * pointSpacing + 28 + 12);
+  const height = 160;
+  const padding = { top: 10, right: 12, bottom: 28, left: 28 };
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const maxValue = Math.max(1, ...series.map((point) => Number(point.value || 0)));
   const chartWidth = width - padding.left - padding.right;
@@ -320,10 +451,7 @@ function TrendChart({ series }) {
         <div
           className="admin-trend-chart__labels"
           aria-hidden="true"
-          style={{
-            width: `${width}px`,
-            gridTemplateColumns: `repeat(${series.length}, minmax(0, 1fr))`,
-          }}
+          style={{ width: "100%" }}
         >
           {series.map((point) => (
             <span key={point.id}>{point.label}</span>
@@ -451,7 +579,6 @@ function DashboardMetric({ label, value, detail }) {
     <article className="admin-stat-card">
       <span>{label}</span>
       <strong>{value}</strong>
-      <p>{detail}</p>
     </article>
   );
 }
@@ -680,10 +807,23 @@ function AdminShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const isArticlesRoute = location.pathname === "/admin/articles";
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   const openLogoutConfirm = () => {
     setLogoutOpen(true);
+  };
+
+  const toggleSidebar = () => {
+    setSidebarOpen((current) => !current);
+  };
+
+  const closeSidebar = () => {
+    setSidebarOpen(false);
   };
 
   const handleLogout = async () => {
@@ -694,7 +834,19 @@ function AdminShell() {
 
   return (
     <div className="admin-shell">
-      <aside className="admin-sidebar">
+      {sidebarOpen && <button type="button" className="admin-sidebar-backdrop" onClick={closeSidebar} aria-label="Close admin menu" />}
+      <button
+        type="button"
+        className={`admin-sidebar-toggle${sidebarOpen ? " admin-sidebar-toggle--open" : ""}`}
+        onClick={toggleSidebar}
+        aria-label={sidebarOpen ? "Close admin menu" : "Open admin menu"}
+        aria-expanded={sidebarOpen}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+      <aside className={`admin-sidebar${sidebarOpen ? " admin-sidebar--open" : ""}`}>
         <Link className="admin-brand" to="/admin/dashboard">
           Pro-Dental CMS
         </Link>
@@ -702,7 +854,7 @@ function AdminShell() {
           {adminLinks
             .filter((link) => !link.ownerOnly || isOwner)
             .map((link) => (
-              <NavLink key={link.to} to={link.to} end={link.end}>
+              <NavLink key={link.to} to={link.to} end={link.end} onClick={closeSidebar}>
                 <span className="admin-nav__icon" aria-hidden="true">
                   <link.icon />
                 </span>
@@ -930,19 +1082,30 @@ export function AdminLogin() {
 export function AdminDashboard() {
   const { isOwner } = useAuth();
   const [dailyVisits, setDailyVisits] = useState([]);
+  const [visitorEvents, setVisitorEvents] = useState([]);
   const [articles, setArticles] = useState([]);
   const [articleEngagements, setArticleEngagements] = useState([]);
   const [subscribers, setSubscribers] = useState([]);
   const [consultations, setConsultations] = useState([]);
+  const [trafficRange, setTrafficRange] = useState("month");
 
   useEffect(() => {
     const visitsQuery = query(
       collection(db, "visitorStats"),
       orderBy("date", "desc"),
-      limit(14)
+      limit(31)
     );
     const unsubscribeVisits = onSnapshot(visitsQuery, (snapshot) => {
       setDailyVisits(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
+    });
+
+    const visitorEventsQuery = query(
+      collection(db, "visitorEvents"),
+      orderBy("capturedAtMs", "desc"),
+      limit(1000)
+    );
+    const unsubscribeVisitorEvents = onSnapshot(visitorEventsQuery, (snapshot) => {
+      setVisitorEvents(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() })));
     });
 
     const unsubscribeArticles = onSnapshot(collection(db, "articles"), (snapshot) => {
@@ -972,6 +1135,7 @@ export function AdminDashboard() {
 
     return () => {
       unsubscribeVisits();
+      unsubscribeVisitorEvents();
       unsubscribeArticles();
       unsubscribeEngagements();
       unsubscribeSubscribers();
@@ -980,7 +1144,19 @@ export function AdminDashboard() {
   }, []);
 
   const todayId = getLocalDateId();
-  const visitSeries = useMemo(() => buildMonthlySeries(dailyVisits), [dailyVisits]);
+  const todayDate = useMemo(() => new Date(), [todayId]);
+  const monthStartDate = useMemo(
+    () => new Date(todayDate.getFullYear(), todayDate.getMonth(), 1),
+    [todayDate]
+  );
+  const monthEndDate = useMemo(
+    () => new Date(todayDate.getFullYear(), todayDate.getMonth() + 1, 0),
+    [todayDate]
+  );
+  const visitSeries = useMemo(
+    () => buildDateRangeSeries(dailyVisits, monthStartDate, monthEndDate),
+    [dailyVisits, monthStartDate, monthEndDate]
+  );
   const activeVisitSeries = useMemo(() => {
     const todayIndex = visitSeries.findIndex((item) => item.id === todayId);
     return todayIndex >= 0 ? visitSeries.slice(0, todayIndex + 1) : visitSeries;
@@ -995,6 +1171,52 @@ export function AdminDashboard() {
         activeVisitSeries[0] || { label: "No data", value: 0 }
       ),
     [activeVisitSeries]
+  );
+  const trafficView = useMemo(() => {
+    const selectedRange = TRAFFIC_RANGE_OPTIONS.find((option) => option.value === trafficRange) || TRAFFIC_RANGE_OPTIONS[0];
+
+    switch (selectedRange.value) {
+      case "week": {
+        const startOfWeek = getStartOfWeek(todayDate);
+        const series = buildDateRangeSeries(dailyVisits, startOfWeek, todayDate);
+        return {
+          label: selectedRange.label,
+          subtitle: "Daily visit totals across the current week.",
+          series,
+        };
+      }
+      case "24h": {
+        const series = buildTrafficTimeSeries(
+          visitorEvents,
+          24 * 60,
+          60,
+          (date) => new Intl.DateTimeFormat("en-US", { hour: "numeric" }).format(date)
+        );
+        return {
+          label: selectedRange.label,
+          subtitle: "Hourly visit totals across the last 24 hours.",
+          series,
+        };
+      }
+      case "60m": {
+        const series = buildTrafficTimeSeries(visitorEvents, 60, 5, (date) => formatTrafficTimeLabel(date));
+        return {
+          label: selectedRange.label,
+          subtitle: "Five-minute visit totals across the last 60 minutes.",
+          series,
+        };
+      }
+      default:
+        return {
+          label: selectedRange.label,
+          subtitle: "Daily visit totals across the current month.",
+          series: visitSeries,
+        };
+    }
+  }, [dailyVisits, todayDate, trafficRange, visitSeries, visitorEvents]);
+  const trafficTotal = useMemo(
+    () => trafficView.series.reduce((sum, item) => sum + Number(item.value || 0), 0),
+    [trafficView.series]
   );
   const articleCounts = useMemo(
     () =>
@@ -1030,15 +1252,25 @@ export function AdminDashboard() {
     () =>
       consultations.reduce(
         (counts, consultation) => {
-          if ((consultation.status || "new") === "contacted") {
+          const status = consultation.status || "new";
+          if (status === "contacted") {
             counts.contacted += 1;
+          } else if (status === "archived") {
+            counts.archived += 1;
           } else {
             counts.new += 1;
           }
           return counts;
         },
-        { new: 0, contacted: 0 }
+        { new: 0, contacted: 0, archived: 0 }
       ),
+    [consultations]
+  );
+  const recentConsultationEmails = useMemo(
+    () =>
+      [...consultations]
+        .sort((first, second) => timestampToMillis(second.createdAt) - timestampToMillis(first.createdAt))
+        .slice(0, 5),
     [consultations]
   );
   const articleOpenTotal = useMemo(
@@ -1094,14 +1326,9 @@ export function AdminDashboard() {
   return (
     <section className="admin-page admin-dashboard-page">
       <div className="admin-page-header admin-page-header--hero">
-        <span>CMS</span>
-        <h1>Dashboard</h1>
-        <p>
-          A clean snapshot of traffic, article status, subscriber activity, and consultation
-          requests.
-        </p>
+        <h3>Dashboard</h3>
       </div>
-      <div className="admin-stat-grid">
+      <div className="admin-stat-flex">
         <DashboardMetric label="Today" value={todayVisits} detail="tracked visits" />
         <DashboardMetric label="This Month" value={monthVisitsTotal} detail="tracked visits" />
         <DashboardMetric label="Published" value={articleCounts.published} detail="live articles" />
@@ -1117,16 +1344,30 @@ export function AdminDashboard() {
         />
         <DashboardMetric label="Article Engagements" value={articleOpenTotal} detail="total engagements" />
       </div>
-      <div className="admin-dashboard-graphs">
+      <div className="admin-dashboard-flex">
         <DashboardGraphCard
           icon={<FaChartLine aria-hidden="true" />}
-          title="Traffic this month"
-          subtitle="Daily visit totals across the current month."
-          total={monthVisitsTotal}
+          title="Traffic"
+          subtitle={trafficView.subtitle}
+          total={trafficTotal}
           totalLabel="visits"
+          actions={
+            <select
+              className="admin-graph-card__filter"
+              aria-label="Filter traffic range"
+              value={trafficRange}
+              onChange={(event) => setTrafficRange(event.target.value)}
+            >
+              {TRAFFIC_RANGE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          }
           className="admin-graph-card--wide"
         >
-          <TrendChart series={visitSeries} />
+          <TrendChart series={trafficView.series} />
         </DashboardGraphCard>
         <section className="admin-engagement-panel">
           <div className="admin-engagement-panel__header">
@@ -1151,33 +1392,54 @@ export function AdminDashboard() {
         </section>
         <DashboardGraphCard
           icon={<FaUsers aria-hidden="true" />}
-          title="Subscribers"
-          subtitle="Active readers versus paused subscriptions."
-          total={subscribers.length}
-          totalLabel="total"
-        >
-          <StatusGraph
-            items={[
-              { label: "Active", value: subscriberCounts.active, color: "#0b8f9e" },
-              { label: "Paused", value: subscriberCounts.paused, color: "#cfd9df" },
-            ]}
-            emptyLabel="No subscribers yet."
-          />
-        </DashboardGraphCard>
-        <DashboardGraphCard
-          icon={<FaChartPie aria-hidden="true" />}
-          title="Consultations"
-          subtitle="New requests and contacted leads."
+          title="Consultation Review"
+          subtitle="Recent consultation emails and booked dates."
           total={consultations.length}
-          totalLabel="total"
+          totalLabel="booked"
+          actions={
+            <Link className="admin-secondary" to="/admin/contact#consultation-review">
+              Open review
+            </Link>
+          }
+          className="admin-graph-card--wide"
         >
-          <StatusGraph
-            items={[
-              { label: "New", value: consultationCounts.new, color: "#0b8f9e" },
-              { label: "Contacted", value: consultationCounts.contacted, color: "#f59e0b" },
-            ]}
-            emptyLabel="No consultation requests yet."
-          />
+          <div className="admin-consultation-preview">
+            <div className="admin-consultation-preview__header">
+              <span>Recent emails</span>
+              <small>
+                {recentConsultationEmails.length > 0
+                  ? `${recentConsultationEmails.length} shown`
+                  : "No consultation emails yet"}
+              </small>
+            </div>
+            <div className="admin-consultation-preview__list">
+              {recentConsultationEmails.length > 0 ? (
+                recentConsultationEmails.map((item) => {
+                  const status = getConsultationStatus(item);
+
+                  return (
+                    <Link
+                      key={item.id}
+                      className="admin-consultation-preview__item"
+                      to="/admin/contact#consultation-review"
+                    >
+                      <div className="admin-consultation-preview__copy">
+                        <strong>{item.email || "No email supplied"}</strong>
+                        <span>Booked for {item.scheduleDate || "no date"}</span>
+                      </div>
+                      <span
+                        className={`admin-consultation-status-badge admin-consultation-status-badge--${status}`}
+                      >
+                        {CONSULTATION_STATUS_LABELS[status]}
+                      </span>
+                    </Link>
+                  );
+                })
+              ) : (
+                <p className="admin-status-graph__empty">No consultation emails yet.</p>
+              )}
+            </div>
+          </div>
         </DashboardGraphCard>
         <DashboardGraphCard
           icon={<FaEye aria-hidden="true" />}
@@ -1209,16 +1471,6 @@ export function AdminDashboard() {
             </div>
           </div>
         </DashboardGraphCard>
-      </div>
-      <div className="admin-card-grid">
-        {adminLinks
-          .slice(1)
-          .filter((link) => !link.ownerOnly || isOwner)
-          .map((link) => (
-            <Link className="admin-card-link" key={link.to} to={link.to}>
-              {link.label}
-            </Link>
-          ))}
       </div>
     </section>
   );
@@ -1512,6 +1764,9 @@ export function ArticlesAdminPage() {
   const [editingId, setEditingId] = useState("");
   const [file, setFile] = useState(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState("");
+  const [writerFile, setWriterFile] = useState(null);
+  const [writerFilePreviewUrl, setWriterFilePreviewUrl] = useState("");
+  const [writerProfileOpen, setWriterProfileOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -1526,6 +1781,7 @@ export function ArticlesAdminPage() {
     [articles]
   );
   const hasArticleMedia = Boolean(filePreviewUrl || draft.mediaUrl);
+  const hasWriterProfileMedia = Boolean(writerFilePreviewUrl || draft.writerPhotoUrl);
 
   useEffect(() => {
     const articlesQuery = query(collection(db, "articles"), orderBy("updatedAt", "desc"));
@@ -1550,15 +1806,32 @@ export function ArticlesAdminPage() {
     };
   }, [file]);
 
+  useEffect(() => {
+    if (!writerFile) {
+      setWriterFilePreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(writerFile);
+    setWriterFilePreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [writerFile]);
+
   const resetDraft = () => {
     setDraft(blankArticle);
     setEditingId("");
     setFile(null);
+    setWriterFile(null);
+    setWriterProfileOpen(false);
   };
 
   const openCreatePanel = () => {
     resetDraft();
     setArticlePanel("create");
+    setWriterProfileOpen(false);
   };
 
   const uploadArticleMedia = async () => {
@@ -1567,18 +1840,30 @@ export function ArticlesAdminPage() {
     return createInlineImageUrl(file);
   };
 
+  const uploadWriterProfileImage = async () => {
+    if (!writerFile) return draft.writerPhotoUrl;
+
+    return createInlineImageUrl(writerFile);
+  };
+
   const saveArticle = async ({ published = draft.published } = {}) => {
     setSaving(true);
     setMessage("");
 
     try {
       let mediaUrl = draft.mediaUrl;
+      let writerPhotoUrl = draft.writerPhotoUrl;
       let saveWarning = "";
 
       if (file) {
         mediaUrl = await uploadArticleMedia();
         saveWarning =
           " The image was compressed and saved with the article.";
+      }
+
+      if (writerFile) {
+        writerPhotoUrl = await uploadWriterProfileImage();
+        saveWarning += " The writer profile picture was compressed and saved too.";
       }
 
       const isPublished = Boolean(published);
@@ -1597,6 +1882,15 @@ export function ArticlesAdminPage() {
         title,
         excerpt,
         body,
+        writerName: draft.writerName.trim(),
+        writerTitle: draft.writerTitle.trim(),
+        writerBio: draft.writerBio.trim(),
+        writerPhotoUrl,
+        writerPhotoAlt: draft.writerPhotoAlt.trim(),
+        writerInstagramUrl: normalizeOptionalUrl(draft.writerInstagramUrl),
+        writerFacebookUrl: normalizeOptionalUrl(draft.writerFacebookUrl),
+        writerLinkedinUrl: normalizeOptionalUrl(draft.writerLinkedinUrl),
+        writerWebsiteUrl: normalizeOptionalUrl(draft.writerWebsiteUrl),
         mediaUrl,
         mediaAlt: draft.mediaAlt.trim(),
         mediaCaption: draft.mediaCaption.trim(),
@@ -1668,6 +1962,8 @@ export function ArticlesAdminPage() {
     setEditingId(article.id);
     setDraft({ ...blankArticle, ...article });
     setFile(null);
+    setWriterFile(null);
+    setWriterProfileOpen(false);
     setArticlePanel("create");
   };
 
@@ -1701,7 +1997,7 @@ export function ArticlesAdminPage() {
       <div className="admin-articles-workspace">
         <main className="admin-articles-stage">
           {articlePanel === "create" ? (
-        <form className="admin-form admin-article-form" onSubmit={handleSubmit}>
+        <form id="admin-form" className="admin-form admin-article-form" onSubmit={handleSubmit}>
           <div className="admin-article-form__hero">
             <div>
               <span className="admin-form-kicker">{editingId ? "Edit article" : "Create article"}</span>
@@ -1837,6 +2133,147 @@ export function ArticlesAdminPage() {
             </div>
           </div>
 
+          <button
+            type="button"
+            className="admin-form-section-toggle"
+            onClick={() => setWriterProfileOpen((current) => !current)}
+            aria-expanded={writerProfileOpen}
+            aria-controls="writer-profile-section"
+          >
+            <span>Add Writer Profile (Optional)</span>
+            <span className="admin-form-section-toggle__icon" aria-hidden="true">
+              {writerProfileOpen ? <FaChevronUp /> : <FaChevronDown />}
+            </span>
+          </button>
+
+          {writerProfileOpen && (
+            <div
+              className="admin-form-section admin-form-section--writer-profile"
+              id="writer-profile-section"
+            >
+              <div className="admin-form-section__header">
+                <h3>Writer Profile</h3>
+                <p>Optional writer details, social links, and profile picture.</p>
+              </div>
+              {(writerFilePreviewUrl || draft.writerPhotoUrl) && (
+                <figure className="admin-image-preview admin-image-preview--writer">
+                  <img
+                    src={writerFilePreviewUrl || draft.writerPhotoUrl}
+                    alt={draft.writerPhotoAlt || draft.writerName || "Writer profile preview"}
+                  />
+                  <figcaption>
+                    {writerFile
+                      ? "Preview of the writer profile picture."
+                      : "Saved writer profile picture."}
+                  </figcaption>
+                </figure>
+              )}
+              <label className="admin-file-drop">
+                <span>Upload Writer Profile Picture</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => setWriterFile(event.target.files?.[0] || null)}
+                />
+              </label>
+              <p className="admin-help-text">
+                Optional. The selected writer picture uploads when you save the article, and the
+                public URL is stored in Firestore with the article.
+              </p>
+              <div className="admin-grid-two">
+                {!hasWriterProfileMedia && (
+                  <label>
+                    Profile Picture URL
+                    <input
+                      value={draft.writerPhotoUrl}
+                      onChange={(event) =>
+                        setDraft((current) => ({ ...current, writerPhotoUrl: event.target.value }))
+                      }
+                    />
+                  </label>
+                )}
+                <label>
+                  Profile Picture Alt Text
+                  <input
+                    value={draft.writerPhotoAlt}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, writerPhotoAlt: event.target.value }))
+                    }
+                  />
+                </label>
+              </div>
+              <div className="admin-grid-two">
+                <label>
+                  Writer Name
+                  <input
+                    value={draft.writerName}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, writerName: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  Writer Title
+                  <input
+                    value={draft.writerTitle}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, writerTitle: event.target.value }))
+                    }
+                  />
+                </label>
+              </div>
+              <label>
+                Writer Bio
+                <textarea
+                  value={draft.writerBio}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, writerBio: event.target.value }))
+                  }
+                  rows={3}
+                />
+              </label>
+              <div className="admin-grid-two">
+                <label>
+                  Instagram URL
+                  <input
+                    value={draft.writerInstagramUrl}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, writerInstagramUrl: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  Facebook URL
+                  <input
+                    value={draft.writerFacebookUrl}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, writerFacebookUrl: event.target.value }))
+                    }
+                  />
+                </label>
+              </div>
+              <div className="admin-grid-two">
+                <label>
+                  LinkedIn URL
+                  <input
+                    value={draft.writerLinkedinUrl}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, writerLinkedinUrl: event.target.value }))
+                    }
+                  />
+                </label>
+                <label>
+                  Website URL
+                  <input
+                    value={draft.writerWebsiteUrl}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, writerWebsiteUrl: event.target.value }))
+                    }
+                  />
+                </label>
+              </div>
+            </div>
+          )}
           {false && (
           <details className="admin-form-section admin-form-section--subscribers">
             <summary className="admin-form-section__header admin-subscriber-toggle">
@@ -1992,6 +2429,7 @@ export function ArticlesAdminPage() {
 
 export function SiteContentEditor({ configKey }) {
   const config = siteContentConfigs[configKey];
+  const location = useLocation();
   const usesFieldActions = true;
   const [form, setForm] = useState(config.fallback);
   const [savedForm, setSavedForm] = useState(config.fallback);
@@ -2011,6 +2449,23 @@ export function SiteContentEditor({ configKey }) {
 
     return unsubscribe;
   }, [config]);
+
+  useEffect(() => {
+    if (configKey !== "contact" || location.hash !== "#consultation-review") {
+      return;
+    }
+
+    const element = document.getElementById("consultation-review");
+    if (!element) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [configKey, location.hash]);
 
   const handleSave = async (event) => {
     event.preventDefault();
@@ -2471,6 +2926,13 @@ export function CollectionEditor({ configKey }) {
 
 function ConsultationsPanel() {
   const [items, setItems] = useState([]);
+  const { user } = useAuth();
+  const [filter, setFilter] = useState("all");
+  const [selectedConsultationId, setSelectedConsultationId] = useState("");
+  const [reviewStatus, setReviewStatus] = useState("new");
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [savingReview, setSavingReview] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState("");
 
   useEffect(() => {
     const consultationQuery = query(
@@ -2487,57 +2949,319 @@ function ConsultationsPanel() {
 
   const statusCounts = useMemo(
     () =>
-      items.reduce((counts, item) => {
-        const status = item.status || "new";
-        counts[status] = (counts[status] || 0) + 1;
-        return counts;
-      }, {}),
+      items.reduce(
+        (counts, item) => {
+          const status = getConsultationStatus(item);
+          counts[status] += 1;
+          counts.all += 1;
+          return counts;
+        },
+        { all: 0, new: 0, contacted: 0, archived: 0 }
+      ),
     [items]
   );
 
+  const filteredItems = useMemo(
+    () => items.filter((item) => filter === "all" || getConsultationStatus(item) === filter),
+    [filter, items]
+  );
+
+  const selectedConsultation = useMemo(
+    () =>
+      filteredItems.find((item) => item.id === selectedConsultationId) ||
+      filteredItems[0] ||
+      null,
+    [filteredItems, selectedConsultationId]
+  );
+
+  useEffect(() => {
+    if (filteredItems.length === 0) {
+      setSelectedConsultationId("");
+      return;
+    }
+
+    if (!filteredItems.some((item) => item.id === selectedConsultationId)) {
+      setSelectedConsultationId(filteredItems[0].id);
+    }
+  }, [filteredItems, selectedConsultationId]);
+
+  useEffect(() => {
+    if (!selectedConsultation) {
+      setReviewStatus("new");
+      setReviewNotes("");
+      setReviewMessage("");
+      return;
+    }
+
+    const nextStatus = getConsultationStatus(selectedConsultation);
+    setReviewStatus(nextStatus);
+    setReviewNotes(selectedConsultation.reviewNotes || selectedConsultation.adminNotes || "");
+  }, [selectedConsultation?.id]);
+
+  const openConsultation = (item) => {
+    setSelectedConsultationId(item.id);
+    setReviewMessage("");
+  };
+
+  const updateConsultation = async (nextStatus, nextNotes = reviewNotes) => {
+    if (!selectedConsultation) return;
+
+    setSavingReview(true);
+    setReviewMessage("");
+
+    try {
+      await updateDoc(doc(db, "consultations", selectedConsultation.id), {
+        status: nextStatus,
+        reviewNotes: String(nextNotes || "").trim(),
+        reviewedAt: serverTimestamp(),
+        reviewedBy: user?.displayName || user?.email || user?.uid || "",
+      });
+      setReviewMessage(`Saved as ${CONSULTATION_STATUS_LABELS[nextStatus] || nextStatus}.`);
+    } catch (error) {
+      setReviewMessage(error.message || "Unable to save the review.");
+    } finally {
+      setSavingReview(false);
+    }
+  };
+
+  const handleSaveReview = async () => {
+    await updateConsultation(reviewStatus, reviewNotes);
+  };
+
+  const handleQuickStatus = async (nextStatus) => {
+    setReviewStatus(nextStatus);
+    await updateConsultation(nextStatus, reviewNotes);
+  };
+
+  const handleDeleteConsultation = async () => {
+    if (!selectedConsultation) return;
+
+    const confirmed = window.confirm(
+      `Delete the consultation request from ${getConsultationName(selectedConsultation)}?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSavingReview(true);
+    setReviewMessage("");
+
+    try {
+      await deleteDoc(doc(db, "consultations", selectedConsultation.id));
+      setReviewMessage("Consultation deleted.");
+      setSelectedConsultationId("");
+    } catch (error) {
+      setReviewMessage(error.message || "Unable to delete the consultation.");
+    } finally {
+      setSavingReview(false);
+    }
+  };
+
   return (
-    <section className="admin-panel">
-      <div className="admin-page-header">
+    <section className="admin-panel admin-consultation-review" id="consultation-review">
+      <div className="admin-page-header admin-consultation-review__header">
         <span>Submissions</span>
-        <h1>Consultation Requests</h1>
-        <p>
-          New: {statusCounts.new || 0} | Contacted: {statusCounts.contacted || 0}
-        </p>
+        <h1>Consultation Review</h1>
+        <p>Filter consultations, review details, and keep internal notes for follow-up.</p>
       </div>
-      <div className="admin-list">
-        {items.length === 0 ? (
-          <p className="admin-empty">No consultation requests yet.</p>
-        ) : (
-          items.map((item) => (
-            <article className="admin-list-item" key={item.id}>
-              <div>
-                <h3>{item.fullName || `${item.firstName} ${item.lastName}`}</h3>
-                <p>
-                  {item.email} | {item.phone} | {item.scheduleDate}
-                </p>
-                <span>{item.status || "new"}</span>
-              </div>
-              <div className="admin-row-actions">
+
+      <div className="admin-consultation-review__stats">
+        <div className="admin-consultation-stat">
+          <span>Total</span>
+          <strong>{statusCounts.all}</strong>
+          <small>requests</small>
+        </div>
+        <div className="admin-consultation-stat">
+          <span>New</span>
+          <strong>{statusCounts.new}</strong>
+          <small>waiting</small>
+        </div>
+        <div className="admin-consultation-stat">
+          <span>Contacted</span>
+          <strong>{statusCounts.contacted}</strong>
+          <small>followed up</small>
+        </div>
+        <div className="admin-consultation-stat">
+          <span>Archived</span>
+          <strong>{statusCounts.archived}</strong>
+          <small>closed</small>
+        </div>
+      </div>
+
+      <div className="admin-consultation-toolbar">
+        <div className="admin-consultation-toolbar__copy">
+          <span>Review queue</span>
+          <strong>{filteredItems.length} shown</strong>
+        </div>
+        <div className="admin-consultation-filters" role="tablist" aria-label="Filter consultations">
+          {CONSULTATION_STATUS_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`admin-consultation-filter${filter === option.value ? " is-active" : ""}`}
+              onClick={() => setFilter(option.value)}
+            >
+              <span>{option.label}</span>
+              <strong>{statusCounts[option.value]}</strong>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="admin-consultation-review__workspace">
+        <div className="admin-consultation-list">
+          {filteredItems.length === 0 ? (
+            <p className="admin-empty">No consultation requests match this filter.</p>
+          ) : (
+            filteredItems.map((item) => {
+              const status = getConsultationStatus(item);
+              const isSelected = selectedConsultation?.id === item.id;
+
+              return (
                 <button
                   type="button"
-                  onClick={() =>
-                    updateDoc(doc(db, "consultations", item.id), {
-                      status: "contacted",
-                    })
-                  }
+                  key={item.id}
+                  className={`admin-consultation-card${isSelected ? " is-selected" : ""}`}
+                  onClick={() => openConsultation(item)}
+                  aria-pressed={isSelected}
                 >
-                  Mark contacted
+                  <div className="admin-consultation-card__header">
+                    <div className="admin-consultation-card__copy">
+                      <strong>{item.email || "No email supplied"}</strong>
+                      <span>Booked for {item.scheduleDate || "no date"}</span>
+                    </div>
+                    <span className={`admin-consultation-status-badge admin-consultation-status-badge--${status}`}>
+                      {CONSULTATION_STATUS_LABELS[status]}
+                    </span>
+                  </div>
+                  <div className="admin-consultation-card__meta">
+                    <span>{formatConsultationTimestamp(item.createdAt)}</span>
+                    <span>{item.phone || "No phone"}</span>
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <aside className="admin-consultation-drawer">
+          {selectedConsultation ? (
+            <>
+              <div className="admin-consultation-drawer__header">
+                <div>
+                  <span>Selected consultation</span>
+                  <h3>{selectedConsultation.email || "No email supplied"}</h3>
+                  <p>Booked by {getConsultationName(selectedConsultation)}</p>
+                </div>
+                <span
+                  className={`admin-consultation-status-badge admin-consultation-status-badge--${getConsultationStatus(
+                    selectedConsultation
+                  )}`}
+                >
+                  {CONSULTATION_STATUS_LABELS[getConsultationStatus(selectedConsultation)]}
+                </span>
+              </div>
+
+              <div className="admin-consultation-drawer__details">
+                <div className="admin-consultation-detail">
+                  <span>Booked by</span>
+                  <strong>{getConsultationName(selectedConsultation)}</strong>
+                </div>
+                <div className="admin-consultation-detail">
+                  <span>Consultation date</span>
+                  <strong>{selectedConsultation.scheduleDate || "Not set"}</strong>
+                </div>
+                <div className="admin-consultation-detail">
+                  <span>Phone</span>
+                  <strong>{selectedConsultation.phone || "Not provided"}</strong>
+                </div>
+                <div className="admin-consultation-detail">
+                  <span>Submitted</span>
+                  <strong>{formatConsultationTimestamp(selectedConsultation.createdAt)}</strong>
+                </div>
+                <div className="admin-consultation-detail">
+                  <span>Reviewed</span>
+                  <strong>{formatConsultationTimestamp(selectedConsultation.reviewedAt)}</strong>
+                </div>
+                <div className="admin-consultation-detail">
+                  <span>Auth</span>
+                  <strong>{selectedConsultation.authEmail || selectedConsultation.authUid || "Guest"}</strong>
+                </div>
+              </div>
+
+              <label className="admin-consultation-field">
+                Status
+                <select
+                  value={reviewStatus}
+                  onChange={(event) => setReviewStatus(event.target.value)}
+                >
+                  {CONSULTATION_STATUS_OPTIONS.filter((option) => option.value !== "all").map(
+                    (option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    )
+                  )}
+                </select>
+              </label>
+
+              <label className="admin-consultation-field">
+                Internal notes
+                <textarea
+                  rows={7}
+                  value={reviewNotes}
+                  onChange={(event) => setReviewNotes(event.target.value)}
+                  placeholder="Add call notes, follow-up details, or any internal review context."
+                />
+              </label>
+
+              {reviewMessage && <p className="admin-message admin-message--card">{reviewMessage}</p>}
+
+              <div className="admin-consultation-drawer__actions">
+                <button type="button" onClick={handleSaveReview} disabled={savingReview}>
+                  {savingReview ? "Saving..." : "Save review"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => deleteDoc(doc(db, "consultations", item.id))}
+                  className="admin-secondary"
+                  onClick={() => handleQuickStatus("new")}
+                  disabled={savingReview}
+                >
+                  Mark new
+                </button>
+                <button
+                  type="button"
+                  className="admin-secondary"
+                  onClick={() => handleQuickStatus("contacted")}
+                  disabled={savingReview}
+                >
+                  Contacted
+                </button>
+                <button
+                  type="button"
+                  className="admin-secondary"
+                  onClick={() => handleQuickStatus("archived")}
+                  disabled={savingReview}
+                >
+                  Archive
+                </button>
+                <button
+                  type="button"
+                  className="admin-secondary admin-secondary--danger"
+                  onClick={handleDeleteConsultation}
+                  disabled={savingReview}
                 >
                   Delete
                 </button>
               </div>
-            </article>
-          ))
-        )}
+            </>
+          ) : (
+            <div className="admin-consultation-drawer__empty">
+              <p className="admin-empty">Select a consultation to review its details.</p>
+            </div>
+          )}
+        </aside>
       </div>
     </section>
   );

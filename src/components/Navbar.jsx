@@ -125,7 +125,7 @@ export default function Navbar() {
   };
 
   const handleSettings = () => {
-    navigate(isAdmin ? "/admin/settings" : "/settings");
+    navigate("/settings");
     setProfileOpen(false);
     setOpen(false);
   };

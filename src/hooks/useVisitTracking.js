@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { doc, increment, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, increment, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
 import { db } from "../firebase";
 
 const getLocalDateId = () => {
@@ -19,7 +19,8 @@ export function useVisitTracking() {
 
     window.localStorage.setItem(storageKey, "1");
 
-    setDoc(
+    const batch = writeBatch(db);
+    batch.set(
       doc(db, "visitorStats", dateId),
       {
         date: dateId,
@@ -27,7 +28,14 @@ export function useVisitTracking() {
         updatedAt: serverTimestamp(),
       },
       { merge: true }
-    ).catch((error) => {
+    );
+    batch.set(doc(collection(db, "visitorEvents")), {
+      date: dateId,
+      capturedAtMs: Date.now(),
+      createdAt: serverTimestamp(),
+    });
+
+    batch.commit().catch((error) => {
       console.error("Visit tracking failed:", error);
       window.localStorage.removeItem(storageKey);
     });
