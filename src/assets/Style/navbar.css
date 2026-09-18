@@ -1,8 +1,9 @@
 .nav {
-  position: sticky;
+  position: fixed;
   top: 0;
   z-index: 1000;
   padding: 1rem;
+  width: 100%;
 
   display: flex;
   align-items: center;
@@ -27,13 +28,6 @@
 
 }
 
-/* Make react-router Link look like the nav text */
-.nav-links .nav-link {
-  color: inherit;
-  text-decoration: none;
-  display: inline-block;
-}
-
 .nav-logo {
   display: flex;
   align-items: center;
@@ -47,6 +41,29 @@
 }
 
 .logo-icon2 {
+  width: 240px;
+  height: auto;
+}
+
+/* The page editor wraps each logo in a `.cms-editable-image` span sized at
+   100%/100% (see visualPageEditor.css) so it can fill a fixed-size box like
+   Hero's image frame. The nav logos have no such box — they're sized by their
+   own width/height rules above — so pin the wrapper and image back down to
+   that intrinsic size while editing, or the image would fall back to its raw
+   upload resolution. */
+.nav-logo .cms-editable-image {
+  display: inline-flex;
+  width: auto;
+  height: auto;
+}
+
+.nav-logo .cms-editable-image:first-of-type img {
+  width: 80px;
+  height: auto;
+  border-radius: 10px;
+}
+
+.nav-logo .cms-editable-image:last-of-type img {
   width: 240px;
   height: auto;
 }

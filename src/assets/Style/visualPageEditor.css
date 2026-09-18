@@ -1,0 +1,999 @@
+.layout-editor {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: calc(100vh - 18px);
+  min-height: 0;
+}
+
+.layout-editor-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2000;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 10px 17px;
+  border: 1px solid #dbe6ee;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+  margin-bottom: 15px;
+}
+
+.layout-editor-toolbar__button--mode.is-active {
+  background: #0b8f9e;
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.layout-editor-toolbar__button--mode.is-active:hover,
+.layout-editor-toolbar__button--mode.is-active:focus-visible {
+  background: #0a7d8a;
+  color: #ffffff;
+}
+
+.layout-editor-body {
+  display: flex;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 15px;
+}
+
+.layout-editor-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.layout-editor-toolbar__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #dbe6ee;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 500;
+  box-shadow: none;
+}
+
+.layout-editor-toolbar__button:hover:not(:disabled),
+.layout-editor-toolbar__button:focus-visible:not(:disabled) {
+  background: #ecfeff;
+  border-color: rgba(11, 143, 158, 0.32);
+  color: #0b8f9e;
+  outline: none;
+}
+
+.layout-editor-toolbar__button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.layout-editor-toolbar__button--primary {
+  background: #0b8f9e;
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.layout-editor-toolbar__button--primary:hover:not(:disabled),
+.layout-editor-toolbar__button--primary:focus-visible:not(:disabled) {
+  background: #0a7d8a;
+  color: #ffffff;
+}
+
+.layout-editor-ribbon__caption {
+  color: #90a4b7;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.layout-editor-ribbon__select {
+  height: 30px;
+  padding: 0 6px;
+  border: 1px solid #dbe6ee;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12px;
+  max-width: 140px;
+}
+
+.layout-editor-ribbon__select--narrow {
+  max-width: 84px;
+}
+
+.layout-editor-ribbon__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: #334155;
+}
+
+.layout-editor-ribbon__button svg {
+  width: 13px;
+  height: 13px;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.layout-editor-ribbon__button:hover,
+.layout-editor-ribbon__button:focus-visible {
+  background: #ecfeff;
+  border-color: rgba(11, 143, 158, 0.32);
+  color: #0b8f9e;
+  outline: none;
+}
+
+.layout-editor-ribbon__button.is-active {
+  background: #0b8f9e;
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.layout-editor-ribbon__color {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid #dbe6ee;
+  border-radius: 6px;
+  color: #334155;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.layout-editor-ribbon__color svg {
+  width: 13px;
+  height: 13px;
+  max-width: none;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.layout-editor-ribbon__color input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}
+
+.layout-editor-ribbon__mini-reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-left: -6px;
+  border: 0;
+  background: #ffffff;
+  border-radius: 999px;
+  color: #94a3b8;
+}
+
+.layout-editor-ribbon__mini-reset svg {
+  width: 11px;
+  height: 11px;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.layout-editor-ribbon__mini-reset:hover,
+.layout-editor-ribbon__mini-reset:focus-visible {
+  color: #b91c1c;
+  outline: none;
+}
+
+.layout-editor-toolbar__divider {
+  width: 1px;
+  align-self: stretch;
+  background: #dbe6ee;
+}
+
+.layout-editor-toolbar__hint {
+  color: #607080;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.layout-editor-popover__row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+
+.layout-editor-panel-section input[type="color"] {
+  width: 36px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid #dbe6ee;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.layout-editor-panel-section input[type="text"],
+.layout-editor-panel-section .layout-editor-popover__row select {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font: inherit;
+  color: #0f172a;
+}
+
+.layout-editor-popover__thumb {
+  width: 100%;
+  height: 72px;
+  border-radius: 7px;
+  border: 1px solid #dbe6ee;
+  background-size: cover;
+  background-position: center;
+  background-color: #f1f5f9;
+}
+
+.layout-editor-popover__reset {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #0b8f9e;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.layout-editor-bg-types {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 8px;
+  background: #f1f5f9;
+}
+
+.layout-editor-bg-type {
+  flex: 1 1 auto;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #526173;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.layout-editor-bg-type:hover {
+  color: #0b8f9e;
+}
+
+.layout-editor-bg-type.is-active {
+  background: #ffffff;
+  color: #0b8f9e;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+}
+
+.layout-editor-popover__label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #607080;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.layout-editor-popover__overlay {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 9px;
+  border-top: 1px solid #e6eef4;
+}
+
+.layout-editor-panel-section input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: #0b8f9e;
+}
+
+.layout-editor-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  padding: 24px;
+  border-radius: 10px;
+  background: #e5eaf0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(11, 143, 158, 0.35) transparent;
+}
+
+.layout-editor-canvas::-webkit-scrollbar,
+.layout-editor-sidepanel__body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.layout-editor-canvas::-webkit-scrollbar-track,
+.layout-editor-sidepanel__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.layout-editor-canvas::-webkit-scrollbar-thumb,
+.layout-editor-sidepanel__body::-webkit-scrollbar-thumb {
+  background: rgba(11, 143, 158, 0.35);
+  border-radius: 999px;
+}
+
+.layout-editor-frame-shell {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+/* Footer filmstrip: a fixed-height bar pinned to the bottom of the whole
+   editor (a sibling of the canvas+panel row, not something that scrolls
+   with the page) — one real thumbnail per section, like a deck's slide
+   filmstrip. */
+.layout-editor-filmstrip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 15px;
+  padding: 10px 14px;
+  border: 1px solid #dbe6ee;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(11, 143, 158, 0.35) transparent;
+}
+
+.layout-editor-filmstrip::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.layout-editor-filmstrip::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.layout-editor-filmstrip::-webkit-scrollbar-thumb {
+  background: rgba(11, 143, 158, 0.35);
+  border-radius: 999px;
+}
+
+.layout-editor-filmstrip__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 5px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+}
+
+.layout-editor-filmstrip__item:hover,
+.layout-editor-filmstrip__item:focus-visible {
+  background: #ecfeff;
+  outline: none;
+}
+
+.layout-editor-filmstrip__item.is-active {
+  border-color: #0b8f9e;
+  background: #ecfeff;
+}
+
+/* The thumb is a fixed-size crop window; the section clone injected into it
+   (see VisualPageEditor's thumbRefs effect) is rendered at full width and
+   scaled down with transform-origin: top left, so whatever doesn't fit is
+   simply clipped here rather than distorted. */
+.layout-editor-filmstrip__thumb {
+  display: block;
+  position: relative;
+  width: 128px;
+  aspect-ratio: 8 / 5;
+  border-radius: 6px;
+  border: 1px solid #dbe6ee;
+  background: #f1f5f9;
+  overflow: hidden;
+}
+
+.layout-editor-filmstrip__thumb * {
+  pointer-events: none;
+}
+
+.layout-editor-filmstrip__caption {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #526173;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.layout-editor-filmstrip__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border-radius: 999px;
+  background: #eef2f6;
+  color: #526173;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.layout-editor-filmstrip__item.is-active .layout-editor-filmstrip__caption {
+  color: #0b8f9e;
+}
+
+.layout-editor-filmstrip__item.is-active .layout-editor-filmstrip__index {
+  background: #0b8f9e;
+  color: #ffffff;
+}
+
+.layout-editor-frame {
+  transform-origin: top left;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+  /* The header is position: fixed, which contains itself to the nearest
+     transformed ancestor — this element's own `transform: scale()` below —
+     so it stays pinned to the top of the scaled preview instead of escaping
+     to the real browser viewport. Rounds the corners the same way
+     overflow: hidden would, but via clip-path so it doesn't disturb that
+     relationship (unlike overflow, transform is what fixed positioning
+     actually keys off). */
+  clip-path: inset(0 round 8px);
+}
+
+.layout-editor-sidepanel {
+  flex: 0 0 300px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid #dbe6ee;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.06);
+}
+
+.layout-editor-sidepanel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid #e6eef4;
+}
+
+.layout-editor-sidepanel__eyebrow {
+  display: block;
+  color: #90a4b7;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.layout-editor-sidepanel__title {
+  margin-top: 2px;
+  color: #0f172a;
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.layout-editor-sidepanel__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  color: #94a3b8;
+  border-radius: 999px;
+}
+
+.layout-editor-sidepanel__close:hover,
+.layout-editor-sidepanel__close:focus-visible {
+  color: #b91c1c;
+  outline: none;
+}
+
+.layout-editor-sidepanel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(11, 143, 158, 0.35) transparent;
+}
+
+.layout-editor-sidepanel__hint {
+  padding-top: 12px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* The Background/Font/Spacing tool stays visible at all times, but is inert
+   until a section is actually selected — it never disappears, it just can't
+   be touched yet. */
+.layout-editor-panel-groups.is-disabled {
+  pointer-events: none;
+  opacity: 0.4;
+  filter: grayscale(0.3);
+}
+
+.layout-editor-panel-section {
+  padding: 14px 0;
+  border-bottom: 1px solid #eef2f6;
+}
+
+.layout-editor-panel-section:last-child {
+  border-bottom: none;
+}
+
+.layout-editor-panel-section__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 9px;
+  color: #526173;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.layout-editor-panel-section__label svg {
+  width: 12px;
+  height: 12px;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.layout-editor-panel-section__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.layout-editor-panel-section > select {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  width: 100%;
+}
+
+/* .section-frame's zero-layout-impact rule lives in index.css (loaded on every
+   route, unlike this file) so it still applies before the admin bundle loads. */
+.section-frame--editable {
+  display: block;
+  position: relative;
+  outline: 2px dashed transparent;
+  outline-offset: -2px;
+  transition: outline-color 120ms ease;
+}
+
+.section-frame--editable:hover {
+  outline-color: rgba(11, 143, 158, 0.55);
+}
+
+.section-frame--selected {
+  outline: 2px solid #0b8f9e;
+  outline-offset: -2px;
+}
+
+.section-frame--drag-over {
+  outline: 2px dashed #0b8f9e;
+  outline-offset: -2px;
+  background: rgba(11, 143, 158, 0.06);
+}
+
+.section-frame__chrome {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 6;
+  display: flex;
+  gap: 5px;
+}
+
+.section-frame__handle,
+.section-frame__edit-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(11, 143, 158, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0b8f9e;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.section-frame__handle svg,
+.section-frame__edit-link svg {
+  width: 14px;
+  height: 14px;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.section-frame__handle {
+  cursor: grab;
+}
+
+.section-frame__handle:active {
+  cursor: grabbing;
+}
+
+.section-frame__handle--static {
+  cursor: pointer;
+}
+
+.section-frame__handle--static:active {
+  cursor: pointer;
+}
+
+.section-frame__handle:hover,
+.section-frame__edit-link:hover,
+.section-frame__handle:focus-visible,
+.section-frame__edit-link:focus-visible {
+  background: #0b8f9e;
+  color: #ffffff;
+  outline: none;
+}
+
+.section-frame__content {
+  pointer-events: none;
+}
+
+[data-cms-interactive="true"] {
+  pointer-events: auto;
+}
+
+.cms-editable-field {
+  outline: 1px dashed transparent;
+  outline-offset: 3px;
+  border-radius: 4px;
+  cursor: text;
+  transition: outline-color 120ms ease, background-color 120ms ease;
+}
+
+.cms-editable-field:hover {
+  outline-color: rgba(11, 143, 158, 0.6);
+  background-color: rgba(11, 143, 158, 0.06);
+}
+
+.cms-editable-field[contenteditable="true"]:focus {
+  outline: 1px dashed #0b8f9e;
+  background-color: transparent;
+}
+
+.cms-editable-field--editing {
+  display: block;
+  width: 100%;
+  outline: 2px solid #0b8f9e;
+  outline-offset: 0;
+  background-color: #ffffff;
+  color: #0f172a;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 6px;
+  font: inherit;
+  resize: vertical;
+}
+
+.cms-editable-image {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
+
+.cms-editable-image img {
+  width: 100%;
+  height: 100%;
+}
+
+.cms-editable-image__overlay {
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(11, 143, 158, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0b8f9e;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.cms-editable-image__overlay svg {
+  width: 14px;
+  height: 14px;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.cms-editable-image__overlay:hover,
+.cms-editable-image__overlay:focus-visible {
+  background: #0b8f9e;
+  color: #ffffff;
+  outline: none;
+}
+
+.section-frame--editable .service-card,
+.section-frame--editable .benefit-card {
+  position: relative;
+}
+
+.cms-card-handle {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(11, 143, 158, 0.2);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0b8f9e;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+  cursor: grab;
+}
+
+.cms-card-handle:active {
+  cursor: grabbing;
+}
+
+.cms-card-handle svg {
+  width: 13px;
+  height: 13px;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.cms-card-handle:hover,
+.cms-card-handle:focus-visible {
+  background: #0b8f9e;
+  color: #ffffff;
+  outline: none;
+}
+
+.cms-card--drag-over {
+  outline: 2px dashed #0b8f9e;
+  outline-offset: -2px;
+  background: rgba(11, 143, 158, 0.06);
+}
+
+/* .cms-slot's zero-layout-impact rule lives in index.css (loaded on every
+   route, unlike this file) so it still applies before the admin bundle loads. */
+.cms-slot--editable {
+  position: relative;
+  display: block;
+  outline: 1px dashed transparent;
+  outline-offset: 4px;
+  border-radius: 6px;
+  transition: outline-color 120ms ease;
+}
+
+.cms-slot--editable:hover {
+  outline-color: rgba(11, 143, 158, 0.5);
+}
+
+.cms-slot--drag-over {
+  outline: 2px dashed #0b8f9e;
+  outline-offset: 4px;
+  background: rgba(11, 143, 158, 0.06);
+}
+
+.cms-slot-handle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(11, 143, 158, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0b8f9e;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.1);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.cms-slot--editable:hover .cms-slot-handle {
+  opacity: 1;
+}
+
+.cms-slot-handle:active {
+  cursor: grabbing;
+}
+
+.cms-slot-handle svg {
+  width: 11px;
+  height: 11px;
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.cms-slot-handle:hover,
+.cms-slot-handle:focus-visible {
+  background: #0b8f9e;
+  color: #ffffff;
+  outline: none;
+  opacity: 1;
+}
+
+/* Pixel move-handle: shared look, positioned differently per context below. */
+.cms-move-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(11, 143, 158, 0.2);
+  background: rgba(255, 255, 255, 0.92);
+  color: #0b8f9e;
+  cursor: grab;
+}
+
+.cms-move-handle:active {
+  cursor: grabbing;
+}
+
+.cms-move-handle svg {
+  max-width: none;
+  flex-shrink: 0;
+}
+
+.cms-move-handle:hover,
+.cms-move-handle:focus-visible {
+  background: #0b8f9e;
+  color: #ffffff;
+  outline: none;
+}
+
+/* Inside SectionFrame's chrome row: a normal flex item, sized like its siblings. */
+.section-frame__chrome .cms-move-handle {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.section-frame__chrome .cms-move-handle svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Inside a reorderable slot: absolute, offset left of the reorder handle, same hover-reveal. */
+.cms-slot--editable .cms-move-handle {
+  position: absolute;
+  top: 6px;
+  right: 34px;
+  z-index: 6;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.cms-slot--editable .cms-move-handle svg {
+  width: 11px;
+  height: 11px;
+}
+
+.cms-slot--editable:hover .cms-move-handle,
+.cms-slot--editable .cms-move-handle:hover,
+.cms-slot--editable .cms-move-handle:focus-visible {
+  opacity: 1;
+}
+
+/* Inside a service/benefit card: absolute, offset left of the reorder handle. */
+.service-card .cms-move-handle,
+.benefit-card .cms-move-handle {
+  position: absolute;
+  top: 9px;
+  right: 41px;
+  z-index: 6;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.service-card .cms-move-handle svg,
+.benefit-card .cms-move-handle svg {
+  width: 13px;
+  height: 13px;
+}
+
+.layout-editor-spacing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.layout-editor-spacing-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.layout-editor-spacing-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.layout-editor-spacing-field input[type="number"] {
+  width: 100%;
+  padding: 5px 6px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font: inherit;
+  color: #0f172a;
+}

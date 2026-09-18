@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
 import {
   NavLink,
   Navigate,
@@ -23,26 +24,36 @@ import {
   writeBatch,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { httpsCallable } from "firebase/functions";
 import {
+  FaAngleDoubleLeft,
+  FaAngleDoubleRight,
   FaArrowLeft,
   FaCheck,
   FaCog,
   FaChartLine,
   FaChartBar,
   FaEye,
-  FaImage,
   FaLayerGroup,
   FaChevronDown,
   FaChevronUp,
+  FaEnvelope,
+  FaKey,
   FaNewspaper,
   FaPen,
   FaPlus,
+  FaQuestion,
+  FaSignOutAlt,
   FaTimes,
   FaUsers,
 } from "react-icons/fa";
 import { useAuth } from "../auth/useAuth";
-import { db, storage } from "../firebase";
+import { AdminShellContext } from "./AdminShellContext";
+import { coerceValue, fieldToInputValue } from "../utils/cmsFieldTypes";
+import { db, functions, storage } from "../firebase";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import AdminResetPasswordModal from "../components/AdminResetPasswordModal";
+import AdminResetPasswordDownloadModal from "../components/AdminResetPasswordDownloadModal";
 import ArticleDeleteConfirmModal from "../components/ArticleDeleteConfirmModal";
 import ArticleEditor from "../components/ArticleEditor";
 import { sendArticleNotificationEmails } from "../services/emailService";
@@ -57,47 +68,32 @@ import {
 } from "../data/defaultContent";
 import "../assets/Style/admin.css";
 
+const resetUserPasswordCallable = httpsCallable(functions, "resetUserPasswordV1");
+
+const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+
+const generateRandomPassword = (length = 12) => {
+  const values = new Uint32Array(length);
+
+  if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(values);
+  } else {
+    for (let index = 0; index < length; index += 1) {
+      values[index] = Math.floor(Math.random() * PASSWORD_CHARS.length);
+    }
+  }
+
+  return Array.from(values, (value) => PASSWORD_CHARS[value % PASSWORD_CHARS.length]).join("");
+};
+
 const adminLinks = [
   { to: "/", label: "Preview Page", icon: FaEye, end: true },
   { to: "/admin/dashboard", label: "Dashboard", icon: FaLayerGroup },
   { to: "/admin/articles", label: "Articles", icon: FaNewspaper },
   { to: "/admin/page-content", label: "Page Content", icon: FaPen },
+  { to: "/admin/faq", label: "FAQ", icon: FaQuestion },
   { to: "/admin/settings", label: "Settings", icon: FaCog },
-  { to: "/admin/media", label: "Media", icon: FaImage },
   { to: "/admin/users", label: "Admins", icon: FaUsers, ownerOnly: true },
-];
-
-const pageContentLinks = [
-  {
-    to: "/admin/hero",
-    label: "Hero",
-    description: "Main homepage headline, benefits, and hero media.",
-  },
-  {
-    to: "/admin/services",
-    label: "Services",
-    description: "Service cards and modal details shown on the homepage.",
-  },
-  {
-    to: "/admin/benefits",
-    label: "Benefits",
-    description: "Practice benefit cards and highlighted support messages.",
-  },
-  {
-    to: "/admin/faq",
-    label: "FAQ",
-    description: "Public frequently asked questions and answers.",
-  },
-  {
-    to: "/admin/about",
-    label: "About",
-    description: "About section paragraphs and supporting image.",
-  },
-  {
-    to: "/admin/contact",
-    label: "Contact",
-    description: "Contact copy, form text, and consultation submissions.",
-  },
 ];
 
 const blankArticle = {
@@ -379,7 +375,24 @@ function TrendChart({ series }) {
     const rect = event.currentTarget.getBoundingClientRect();
     const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
     const index = Math.min(series.length - 1, Math.max(0, Math.round(ratio * (series.length - 1))));
-    setHoveredPoint(points[index] || null);
+    const point = points[index];
+    if (!point) {
+      setHoveredPoint(null);
+      return;
+    }
+
+    // The SVG is scaled by CSS (width: 100%) to fit the card, so its
+    // rendered size rarely matches the viewBox's coordinate space — the
+    // tooltip is a plain HTML div overlaid on top, so it needs the point's
+    // position converted into that same rendered (on-screen) space, not the
+    // raw viewBox units, or it drifts off to the side as the chart shrinks.
+    setHoveredPoint({
+      ...point,
+      renderedX: point.x * (rect.width / width),
+      renderedY: point.y * (rect.height / height),
+      renderedWidth: rect.width,
+      renderedHeight: rect.height,
+    });
   };
 
   const handlePointerLeave = () => {
@@ -389,8 +402,12 @@ function TrendChart({ series }) {
   const yTicks = [0.25, 0.5, 0.75, 1];
   const tickValues = yTicks.map((tick) => Math.round(maxValue * tick));
   const tooltipPoint = hoveredPoint;
-  const tooltipLeft = tooltipPoint ? Math.min(tooltipPoint.x + 20, width - 172) : 0;
-  const tooltipTop = tooltipPoint ? Math.min(Math.max(tooltipPoint.y - 24, 10), height - 82) : 0;
+  const tooltipLeft = tooltipPoint
+    ? Math.max(8, Math.min(tooltipPoint.renderedX + 20, tooltipPoint.renderedWidth - 172))
+    : 0;
+  const tooltipTop = tooltipPoint
+    ? Math.min(Math.max(tooltipPoint.renderedY - 24, 10), tooltipPoint.renderedHeight - 82)
+    : 0;
 
   return (
     <div className="admin-trend-chart">
@@ -685,30 +702,6 @@ const emptyFromFields = (fields) =>
     return values;
   }, {});
 
-const coerceValue = (field, value) => {
-  if (field.type === "number") return Number(value || 0);
-  if (field.type === "checkbox") return Boolean(value);
-  if (field.type === "lines") {
-    return String(value || "")
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean);
-  }
-  if (field.type === "blocks") {
-    return String(value || "")
-      .split(/\n\s*\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-  }
-  return value || "";
-};
-
-const fieldToInputValue = (field, value) => {
-  if (field.type === "lines") return (value || []).join("\n");
-  if (field.type === "blocks") return (value || []).join("\n\n");
-  return value ?? "";
-};
-
 const INLINE_IMAGE_MAX_BYTES = 650 * 1024;
 
 const sanitizeStorageFileName = (name = "") =>
@@ -808,6 +801,7 @@ function AdminShell() {
   const navigate = useNavigate();
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const isArticlesRoute = location.pathname === "/admin/articles";
 
   useEffect(() => {
@@ -826,60 +820,96 @@ function AdminShell() {
     setSidebarOpen(false);
   };
 
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((current) => !current);
+  };
+
+  const collapseSidebar = useCallback(() => {
+    setSidebarCollapsed(true);
+  }, []);
+
   const handleLogout = async () => {
     setLogoutOpen(false);
     await logout();
     navigate("/login");
   };
 
-  return (
-    <div className="admin-shell">
-      {sidebarOpen && <button type="button" className="admin-sidebar-backdrop" onClick={closeSidebar} aria-label="Close admin menu" />}
-      <button
-        type="button"
-        className={`admin-sidebar-toggle${sidebarOpen ? " admin-sidebar-toggle--open" : ""}`}
-        onClick={toggleSidebar}
-        aria-label={sidebarOpen ? "Close admin menu" : "Open admin menu"}
-        aria-expanded={sidebarOpen}
-      >
-        <span />
-        <span />
-        <span />
-      </button>
-      <aside className={`admin-sidebar${sidebarOpen ? " admin-sidebar--open" : ""}`}>
-        <Link className="admin-brand" to="/admin/dashboard">
-          Pro-Dental CMS
-        </Link>
-        <nav className="admin-nav">
-          {adminLinks
-            .filter((link) => !link.ownerOnly || isOwner)
-            .map((link) => (
-              <NavLink key={link.to} to={link.to} end={link.end} onClick={closeSidebar}>
-                <span className="admin-nav__icon" aria-hidden="true">
-                  <link.icon />
-                </span>
-                {link.label}
-              </NavLink>
-            ))}
-        </nav>
-        <div className="admin-user">
-          <span>{user?.email}</span>
-          <span>{adminProfile?.role || "admin"}</span>
-          <button type="button" onClick={openLogoutConfirm}>
-            Sign out
-          </button>
-        </div>
-      </aside>
-      <main className={`admin-main${isArticlesRoute ? " admin-main--articles" : ""}`}>
-        <Outlet />
-      </main>
-      <LogoutConfirmModal
-        isOpen={logoutOpen}
-        onCancel={() => setLogoutOpen(false)}
-        onConfirm={handleLogout}
-      />
-    </div>
+  const adminShellContextValue = useMemo(
+    () => ({ sidebarCollapsed, setSidebarCollapsed, collapseSidebar }),
+    [sidebarCollapsed, collapseSidebar]
   );
+
+  return (
+    <AdminShellContext.Provider value={adminShellContextValue}>
+      <div className={`admin-shell${sidebarCollapsed ? " admin-shell--sidebar-collapsed" : ""}`}>
+        {sidebarOpen && <button type="button" className="admin-sidebar-backdrop" onClick={closeSidebar} aria-label="Close admin menu" />}
+        <button
+          type="button"
+          className={`admin-sidebar-toggle${sidebarOpen ? " admin-sidebar-toggle--open" : ""}`}
+          onClick={toggleSidebar}
+          aria-label={sidebarOpen ? "Close admin menu" : "Open admin menu"}
+          aria-expanded={sidebarOpen}
+        >
+          <span />
+          <span />
+          <span />
+        </button>
+        <aside
+          className={`admin-sidebar${sidebarOpen ? " admin-sidebar--open" : ""}${
+            sidebarCollapsed ? " admin-sidebar--collapsed" : ""
+          }`}
+        >
+          <div className="admin-sidebar__header">
+            <Link className="admin-brand" to="/admin/dashboard">
+              <span className="admin-brand__label">Pro-Dental CMS</span>
+            </Link>
+            <button
+              type="button"
+              className="admin-sidebar-collapse-toggle"
+              onClick={toggleSidebarCollapsed}
+              aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              aria-expanded={!sidebarCollapsed}
+              title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {sidebarCollapsed ? <FaAngleDoubleRight /> : <FaAngleDoubleLeft />}
+            </button>
+          </div>
+          <nav className="admin-nav">
+            {adminLinks
+              .filter((link) => !link.ownerOnly || isOwner)
+              .map((link) => (
+                <NavLink key={link.to} to={link.to} end={link.end} onClick={closeSidebar} title={link.label}>
+                  <span className="admin-nav__icon" aria-hidden="true">
+                    <link.icon />
+                  </span>
+                  <span className="admin-nav__label">{link.label}</span>
+                </NavLink>
+              ))}
+          </nav>
+          <div className="admin-user">
+            <span className="admin-user__email">{user?.email}</span>
+            <span className="admin-user__role">{adminProfile?.role || "admin"}</span>
+            <button type="button" onClick={openLogoutConfirm} title="Sign out">
+              <FaSignOutAlt aria-hidden="true" />
+              <span className="admin-user__signout-label">Sign out</span>
+            </button>
+          </div>
+        </aside>
+        <main className={`admin-main${isArticlesRoute ? " admin-main--articles" : ""}`}>
+          <Outlet />
+        </main>
+        <LogoutConfirmModal
+          isOpen={logoutOpen}
+          onCancel={() => setLogoutOpen(false)}
+          onConfirm={handleLogout}
+        />
+      </div>
+    </AdminShellContext.Provider>
+  );
+}
+
+export function DevAdminPreviewShell() {
+  return <AdminShell />;
 }
 
 export function RequireAdmin({ children }) {
@@ -1273,6 +1303,14 @@ export function AdminDashboard() {
         .slice(0, 5),
     [consultations]
   );
+  const recentActiveSubscribers = useMemo(
+    () =>
+      subscribers
+        .filter((subscriber) => subscriber.status !== "paused")
+        .sort((first, second) => timestampToMillis(second.createdAt) - timestampToMillis(first.createdAt))
+        .slice(0, 5),
+    [subscribers]
+  );
   const articleOpenTotal = useMemo(
     () => articleEngagements.length,
     [articleEngagements]
@@ -1471,31 +1509,48 @@ export function AdminDashboard() {
             </div>
           </div>
         </DashboardGraphCard>
+        <DashboardGraphCard
+          icon={<FaEnvelope aria-hidden="true" />}
+          title="Active Subscribers"
+          subtitle="Readers currently opted in to article notifications."
+          total={subscriberCounts.active}
+          totalLabel="active"
+          actions={
+            <Link className="admin-secondary" to="/admin/users">
+              Manage
+            </Link>
+          }
+        >
+          <div className="admin-subscriber-preview">
+            <div className="admin-subscriber-preview__header">
+              <span>Recently subscribed</span>
+              <small>
+                {recentActiveSubscribers.length > 0
+                  ? `${recentActiveSubscribers.length} shown`
+                  : "No active subscribers yet"}
+              </small>
+            </div>
+            <div className="admin-subscriber-preview__list">
+              {recentActiveSubscribers.length > 0 ? (
+                recentActiveSubscribers.map((subscriber) => (
+                  <div className="admin-subscriber-preview__item" key={subscriber.id}>
+                    <div className="admin-subscriber-preview__copy">
+                      <strong>{subscriber.email || "No email on file"}</strong>
+                      <span>{subscriber.displayName || subscriber.source || "Direct sign-up"}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="admin-status-graph__empty">No active subscribers yet.</p>
+              )}
+            </div>
+          </div>
+        </DashboardGraphCard>
       </div>
     </section>
   );
 }
 
-export function PageContentPanel() {
-  return (
-    <section className="admin-page">
-      <div className="admin-page-header">
-        <span>Content Hub</span>
-        <h1>Page Content</h1>
-        <p>Choose a public page section to edit.</p>
-      </div>
-
-      <div className="admin-content-grid">
-        {pageContentLinks.map((link) => (
-          <Link className="admin-content-link" key={link.to} to={link.to}>
-            <span>{link.label}</span>
-            <p>{link.description}</p>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 export function AdminUsersPage() {
   const { isOwner, user } = useAuth();
@@ -1504,6 +1559,12 @@ export function AdminUsersPage() {
   const [selectedSubscriberId, setSelectedSubscriberId] = useState("");
   const [draft, setDraft] = useState({ uid: "", email: "", role: "admin" });
   const [message, setMessage] = useState("");
+  const [resetTarget, setResetTarget] = useState(null);
+  const [resetStage, setResetStage] = useState(null);
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetSaving, setResetSaving] = useState(false);
+  const [resetResult, setResetResult] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "admins"), (snapshot) => {
@@ -1627,6 +1688,117 @@ export function AdminUsersPage() {
     }
   };
 
+  const openResetPassword = (target) => {
+    setResetTarget(target);
+    setResetPassword(generateRandomPassword());
+    setResetError("");
+    setResetResult(null);
+    setResetStage("confirm");
+  };
+
+  const closeResetPassword = () => {
+    setResetTarget(null);
+    setResetStage(null);
+    setResetPassword("");
+    setResetError("");
+    setResetSaving(false);
+    setResetResult(null);
+  };
+
+  const handleResetConfirm = async () => {
+    if (!resetTarget?.uid || resetPassword.length < 8) {
+      return;
+    }
+
+    setResetSaving(true);
+    setResetError("");
+
+    try {
+      const response = await resetUserPasswordCallable({
+        uid: resetTarget.uid,
+        newPassword: resetPassword,
+      });
+
+      setResetResult({
+        uid: resetTarget.uid,
+        email: resetTarget.email || response.data?.email || "",
+        password: resetPassword,
+      });
+      setResetStage("download");
+    } catch (error) {
+      setResetError(error.message || "Unable to reset the password.");
+    } finally {
+      setResetSaving(false);
+    }
+  };
+
+  const handleDownloadCredentials = () => {
+    if (!resetResult) return;
+
+    const pageWidth = 210;
+    const marginX = 20;
+    const contentWidth = pageWidth - marginX * 2;
+    let y = 24;
+
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+
+    doc.setFillColor(11, 143, 158);
+    doc.rect(0, 0, pageWidth, 16, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Pro-Dental BPO", marginX, 10.5);
+
+    y = 30;
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("Temporary Login Credentials", marginX, y);
+
+    y += 12;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(marginX, y, pageWidth - marginX, y);
+
+    const field = (label, value) => {
+      y += 12;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(100, 116, 139);
+      doc.text(label.toUpperCase(), marginX, y);
+      y += 6;
+      doc.setFont("courier", "normal");
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42);
+      doc.text(String(value), marginX, y);
+    };
+
+    field("Email", resetResult.email || resetResult.uid);
+    field("Temporary password", resetResult.password);
+    field("Login page", `${window.location.origin}/login`);
+
+    y += 14;
+    doc.setDrawColor(226, 232, 240);
+    doc.line(marginX, y, pageWidth - marginX, y);
+
+    y += 10;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10.5);
+    doc.setTextColor(71, 85, 105);
+    const notice = doc.splitTextToSize(
+      "This password is temporary. You will be required to set your own password " +
+        "the first time you sign in with it.",
+      contentWidth
+    );
+    doc.text(notice, marginX, y);
+    y += notice.length * 5 + 10;
+
+    doc.setFontSize(9);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Generated on ${new Date().toLocaleString()}`, marginX, y);
+
+    doc.save(`pro-dental-bpo-credentials-${resetResult.email || resetResult.uid}.pdf`);
+  };
+
   return (
     <section className="admin-page">
       <div className="admin-page-header">
@@ -1668,6 +1840,14 @@ export function AdminUsersPage() {
                   <div className="admin-row-actions">
                     <button type="button" onClick={() => handleSelectSubscriber(subscriber)}>
                       {isSelected ? "Loaded" : "Load"}
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-secondary"
+                      onClick={() => openResetPassword({ uid, email: subscriber.email || "" })}
+                      disabled={!uid}
+                    >
+                      <FaKey aria-hidden="true" /> Reset Password
                     </button>
                   </div>
                 </article>
@@ -1744,6 +1924,13 @@ export function AdminUsersPage() {
               <div className="admin-row-actions">
                 <button
                   type="button"
+                  className="admin-secondary"
+                  onClick={() => openResetPassword({ uid: admin.uid, email: admin.email || "" })}
+                >
+                  <FaKey aria-hidden="true" /> Reset Password
+                </button>
+                <button
+                  type="button"
                   disabled={admin.uid === user?.uid}
                   onClick={() => deleteDoc(doc(db, "admins", admin.uid))}
                 >
@@ -1754,6 +1941,26 @@ export function AdminUsersPage() {
           ))}
         </div>
       </div>
+
+      <AdminResetPasswordModal
+        isOpen={resetStage === "confirm"}
+        email={resetTarget?.email || resetTarget?.uid || ""}
+        password={resetPassword}
+        onPasswordChange={setResetPassword}
+        onRegenerate={() => setResetPassword(generateRandomPassword())}
+        onCancel={closeResetPassword}
+        onConfirm={handleResetConfirm}
+        loading={resetSaving}
+        error={resetError}
+      />
+
+      <AdminResetPasswordDownloadModal
+        isOpen={resetStage === "download"}
+        email={resetResult?.email || resetResult?.uid || ""}
+        password={resetResult?.password || ""}
+        onDownload={handleDownloadCredentials}
+        onClose={closeResetPassword}
+      />
     </section>
   );
 }
@@ -1988,9 +2195,6 @@ export function ArticlesAdminPage() {
   const isDraftPanel = articlePanel === "drafts";
   const galleryTitle = isDraftPanel ? "Draft Articles" : "Published Articles";
   const galleryKicker = isDraftPanel ? "Drafts" : "Saved";
-  const galleryDescription = isDraftPanel
-    ? "Unpublished articles waiting for review or cleanup."
-    : "Published articles are shown by default with their featured images.";
 
   return (
     <section className="admin-page admin-articles-page">
@@ -2342,7 +2546,6 @@ export function ArticlesAdminPage() {
                   <span>{galleryKicker}</span>
                   <h2>{galleryTitle}</h2>
                 </div>
-                <p>{galleryDescription}</p>
               </div>
               {visibleArticles.length === 0 ? (
                 <p className="admin-empty">
@@ -2695,6 +2898,7 @@ function AdminField({
 
 export function CollectionEditor({ configKey }) {
   const config = collectionConfigs[configKey];
+  const isFaqCollection = configKey === "faqs";
   const [items, setItems] = useState([]);
   const [draft, setDraft] = useState(emptyFromFields(config.fields));
   const [savedDraft, setSavedDraft] = useState(emptyFromFields(config.fields));
@@ -2702,6 +2906,7 @@ export function CollectionEditor({ configKey }) {
   const [editableFields, setEditableFields] = useState({});
   const [savingFields, setSavingFields] = useState({});
   const [message, setMessage] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     const collectionQuery = query(
@@ -2775,6 +2980,17 @@ export function CollectionEditor({ configKey }) {
     setEditableFields({});
     setSavingFields({});
     setMessage("");
+    setDrawerOpen(true);
+  };
+
+  const handleAddNew = () => {
+    resetDraft();
+    setDrawerOpen(true);
+  };
+
+  const closeDrawer = () => {
+    setDrawerOpen(false);
+    resetDraft();
   };
 
   const handleDelete = async (id) => {
@@ -2843,83 +3059,129 @@ export function CollectionEditor({ configKey }) {
     }
   };
 
+  const fieldInputs = config.fields.map((field) => (
+    <AdminField
+      key={field.name}
+      field={field}
+      value={draft[field.name]}
+      onChange={(value) =>
+        setDraft((current) => ({ ...current, [field.name]: value }))
+      }
+      locked={Boolean(editingId) && !editableFields[field.name]}
+      saving={Boolean(savingFields[field.name])}
+      onEdit={editingId ? () => handleFieldEdit(field.name) : undefined}
+      onSave={editingId ? () => handleFieldSave(field) : undefined}
+      onCancel={editingId ? () => handleFieldCancel(field.name) : undefined}
+    />
+  ));
+
+  const formActions = (
+    <div className="admin-actions">
+      {!editingId && <button type="submit">Create</button>}
+      <button type="button" className="admin-secondary" onClick={resetDraft}>
+        Clear
+      </button>
+      <button type="button" className="admin-secondary" onClick={seedDefaults}>
+        Seed defaults
+      </button>
+    </div>
+  );
+
+  const listMarkup = (
+    <div className="admin-list">
+      {items.length === 0 ? (
+        <p className="admin-empty">No saved items yet.</p>
+      ) : (
+        items.map((item) => (
+          <article className="admin-list-item" key={item.id}>
+            <div>
+              <h3>{item.title || item.question || item.category}</h3>
+              <p>{item.shortDescription || item.description || item.answer}</p>
+              <span>{item.published === false ? "Draft" : "Published"}</span>
+            </div>
+            <div className="admin-row-actions">
+              <button type="button" onClick={() => handleEdit(item)}>
+                Edit
+              </button>
+              <button type="button" onClick={() => handleDelete(item.id)}>
+                Delete
+              </button>
+            </div>
+          </article>
+        ))
+      )}
+    </div>
+  );
+
   return (
     <section className="admin-page">
-      <div className="admin-page-header">
+      <div className={`admin-page-header${isFaqCollection ? " admin-page-header--faq" : ""}`}>
         <Link className="admin-back-link" to="/admin/page-content">
           <FaArrowLeft aria-hidden="true" />
           <span className="sr-only">Back to Page Content</span>
         </Link>
         <span>Collection</span>
         <h1>{config.title}</h1>
+        {isFaqCollection && (
+          <button
+            type="button"
+            className="admin-faq-add-button"
+            onClick={handleAddNew}
+            aria-label="Add FAQ"
+            title="Add FAQ"
+          >
+            <FaPlus aria-hidden="true" />
+          </button>
+        )}
       </div>
 
-      <div className="admin-two-column">
-        <form className="admin-form" onSubmit={handleSubmit}>
-          <h2>{editingId ? "Edit item" : "Add item"}</h2>
-          {config.fields.map((field) => (
-            <AdminField
-              key={field.name}
-              field={field}
-              value={draft[field.name]}
-              onChange={(value) =>
-                setDraft((current) => ({ ...current, [field.name]: value }))
-              }
-              locked={Boolean(editingId) && !editableFields[field.name]}
-              saving={Boolean(savingFields[field.name])}
-              onEdit={
-                editingId
-                  ? () => handleFieldEdit(field.name)
-                  : undefined
-              }
-              onSave={
-                editingId
-                  ? () => handleFieldSave(field)
-                  : undefined
-              }
-              onCancel={
-                editingId
-                  ? () => handleFieldCancel(field.name)
-                  : undefined
-              }
+      {isFaqCollection ? (
+        <>
+          {listMarkup}
+
+          {drawerOpen && (
+            <button
+              type="button"
+              className="admin-faq-drawer-backdrop"
+              aria-label="Close"
+              onClick={closeDrawer}
             />
-          ))}
-          {message && <p className="admin-message">{message}</p>}
-          <div className="admin-actions">
-            {!editingId && <button type="submit">Create</button>}
-            <button type="button" className="admin-secondary" onClick={resetDraft}>
-              Clear
-            </button>
-            <button type="button" className="admin-secondary" onClick={seedDefaults}>
-              Seed defaults
-            </button>
-          </div>
-        </form>
-
-        <div className="admin-list">
-          {items.length === 0 ? (
-            <p className="admin-empty">No saved items yet.</p>
-          ) : (
-            items.map((item) => (
-              <article className="admin-list-item" key={item.id}>
-                <div>
-                  <h3>{item.title || item.question || item.category}</h3>
-                  <p>{item.shortDescription || item.description || item.answer}</p>
-                  <span>{item.published === false ? "Draft" : "Published"}</span>
-                </div>
-                <div className="admin-row-actions">
-                  <button type="button" onClick={() => handleEdit(item)}>
-                    Edit
-                  </button>
-                  <button type="button" onClick={() => handleDelete(item.id)}>
-                    Delete
-                  </button>
-                </div>
-              </article>
-            ))
           )}
+
+          <aside
+            className={`admin-faq-drawer${drawerOpen ? " admin-faq-drawer--open" : ""}`}
+            aria-hidden={!drawerOpen}
+          >
+            <div className="admin-faq-drawer__header">
+              <h2>{editingId ? "Edit item" : "Add item"}</h2>
+              <button
+                type="button"
+                className="admin-faq-drawer__close"
+                onClick={closeDrawer}
+                aria-label="Close"
+              >
+                <FaTimes aria-hidden="true" />
+              </button>
+            </div>
+            <form className="admin-form" onSubmit={handleSubmit}>
+              {fieldInputs}
+              {message && <p className="admin-message">{message}</p>}
+              {formActions}
+            </form>
+          </aside>
+        </>
+      ) : (
+        <div className="admin-two-column">
+          <form className="admin-form" onSubmit={handleSubmit}>
+            <h2>{editingId ? "Edit item" : "Add item"}</h2>
+            {fieldInputs}
+            {message && <p className="admin-message">{message}</p>}
+            {formActions}
+          </form>
+
+          {listMarkup}
         </div>
-      </div>
+      )}
     </section>
   );
 }

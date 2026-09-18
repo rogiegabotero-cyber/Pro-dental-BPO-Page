@@ -12,6 +12,7 @@ import {
 import Contact from "./components/Contact";
 import FAQ from "./components/FAQ";
 import FloatingClientPreview from "./components/FloatingClientPreview";
+import ForcePasswordChangeGate from "./components/ForcePasswordChangeGate";
 import Footer from "./components/Footer";
 import Home from "./components/Hero";
 import Login from "./components/Login";
@@ -21,7 +22,10 @@ import NewsletterPromptDrawer from "./components/NewsletterPromptDrawer";
 import { NewsletterPromptProvider } from "./components/NewsletterPromptContext";
 import Reviews from "./components/Reviews";
 import Services from "./components/Services";
+import SectionFrame from "./components/SectionFrame";
 import { useVisitTracking } from "./hooks/useVisitTracking";
+import { useCmsLayout, normalizeSectionOrder } from "./hooks/useCmsData";
+import { useLayoutEditorContext } from "./context/LayoutEditorContext";
 
 const lazyAdmin = (exportName) =>
   lazy(() =>
@@ -36,8 +40,17 @@ const AdminUsersPage = lazyAdmin("AdminUsersPage");
 const ArticlesAdminPage = lazyAdmin("ArticlesAdminPage");
 const CollectionEditor = lazyAdmin("CollectionEditor");
 const MediaPage = lazyAdmin("MediaPage");
-const PageContentPanel = lazyAdmin("PageContentPanel");
 const SiteContentEditor = lazyAdmin("SiteContentEditor");
+const VisualPageEditor = lazy(() => import("./admin/VisualPageEditor"));
+
+const SECTION_COMPONENTS = {
+  hero: Home,
+  services: Services,
+  about: About,
+  benefits: Reviews,
+  contact: Contact,
+  footer: Footer,
+};
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -49,17 +62,28 @@ function ScrollToTop() {
   return null;
 }
 
-function PublicHome() {
+export function PublicHome() {
+  const { data: layout } = useCmsLayout();
+  const editorContext = useLayoutEditorContext();
+  const liveOrder = editorContext?.editMode ? editorContext.pendingOrder : layout.order;
+  const order = normalizeSectionOrder(liveOrder, Object.keys(SECTION_COMPONENTS));
+
   return (
     <>
-      <Navbar />
-      <Home />
-      <Services />
-      <About />
-      <Reviews />
-      <ArticlePreviewSection />
-      <Contact />
-      <Footer />
+      <SectionFrame sectionKey="navbar" reorderable={false}>
+        <Navbar />
+      </SectionFrame>
+      {order.map((sectionKey) => {
+        const Section = SECTION_COMPONENTS[sectionKey];
+        if (!Section) return null;
+
+        return (
+          <SectionFrame key={sectionKey} sectionKey={sectionKey}>
+            <Section />
+            {sectionKey === "benefits" && <ArticlePreviewSection />}
+          </SectionFrame>
+        );
+      })}
     </>
   );
 }
@@ -124,7 +148,7 @@ function App() {
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="articles" element={<ArticlesAdminPage />} />
-                <Route path="page-content" element={<PageContentPanel />} />
+                <Route path="page-content" element={<VisualPageEditor />} />
                 <Route path="hero" element={<SiteContentEditor configKey="hero" />} />
                 <Route
                   path="services"
@@ -152,6 +176,7 @@ function App() {
           <NewsletterPromptDrawer />
         </NewsletterPromptProvider>
         <FloatingClientPreview />
+        <ForcePasswordChangeGate />
       </Router>
     </AuthProvider>
   );

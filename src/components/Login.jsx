@@ -228,20 +228,6 @@ export default function Login() {
   return (
     <main className="login-page">
       <section className="login-card">
-        <aside className="login-art" aria-label="Welcome back">
-          <div className="login-brand-dot" />
-          <span className="login-brand">Pro-Dental BPO</span>
-          <div className="login-orbit login-orbit--one" />
-          <div className="login-orbit login-orbit--two" />
-          <div className="login-art-copy">
-            <small>Nice to see you</small>
-            <h1>Welcome to Pro-Dental BPO</h1>
-            <p>
-              Access articles, account tools, and be notify when new article is posted.
-            </p>
-          </div>
-        </aside>
-
         <section className="login-panel">
           <span>Login Account</span>
           <h2>{authMode === "signup" ? "Sign up" : "Sign in"}</h2>
@@ -332,6 +318,13 @@ export default function Login() {
             Skip for now
           </Link>
         </section>
+
+        {submitting && (
+          <div className="login-loading" role="status" aria-live="polite">
+            <span className="login-loading__spinner" aria-hidden="true" />
+            <p>{authMode === "signup" ? "Creating your account…" : "Signing you in…"}</p>
+          </div>
+        )}
       </section>
       <LogoutConfirmModal
         isOpen={logoutOpen}

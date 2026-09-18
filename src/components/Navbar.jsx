@@ -12,8 +12,12 @@ import dental_logo from "../assets/Image/1.webp";
 import dental_logo2 from "../assets/Image/2.webp";
 import LogoutConfirmModal from "./LogoutConfirmModal";
 import "../assets/Style/navbar.css";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
+import { defaultNavbarContent } from "../data/defaultContent";
+import { useCmsDocumentOverride, useSectionStyleOverride } from "../hooks/useCmsData";
+import { useLayoutEditorContext } from "../context/LayoutEditorContext";
+import { EditableCmsField, EditableCmsImage } from "./EditableCmsField";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
@@ -22,11 +26,34 @@ export default function Navbar() {
   const [isScrolling, setIsScrolling] = useState(false);
   const scrollTimeout = useRef(null);
   const profileRef = useRef(null);
+  const navRef = useRef(null);
+  const [navHeight, setNavHeight] = useState(0);
   const [activeSection, setActiveSection] = useState("");
   const { user, logout, isAdmin, isOwner } = useAuth();
 
   const location = useLocation();
   const navigate = useNavigate();
+  const { data: navbar } = useCmsDocumentOverride("navbar", defaultNavbarContent);
+  const { style: navbarStyle } = useSectionStyleOverride("navbar");
+  const ctx = useLayoutEditorContext();
+  const updateNavbarField = (fieldName, value) => ctx?.updateFieldContent("navbar", fieldName, value);
+  const navbarFieldRef = (fieldName) => ({ kind: "content", docId: "navbar", fieldName });
+
+  // .nav is position: fixed, so it no longer reserves its own space in the
+  // page flow — this spacer (sized to the nav's real, current height) takes
+  // its place instead, so content isn't hidden underneath. Measured live
+  // since the nav's height changes across breakpoints (mobile logo/padding
+  // sizes) and whenever its content changes.
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return undefined;
+
+    const updateHeight = () => setNavHeight(nav.offsetHeight);
+    updateHeight();
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -171,14 +198,31 @@ export default function Navbar() {
   }, [location.pathname]);
 
   return (
-    <nav className={`nav ${isScrolling ? "scrolling" : ""}`}>
+    <>
+    <nav ref={navRef} className={`nav ${isScrolling ? "scrolling" : ""}`} style={navbarStyle}>
       <div
         className="nav-logo logo-tooltip-wrapper"
         onClick={handleLogoClick}
         style={{ cursor: "pointer" }}
       >
-        <img src={dental_logo} className="logo-icon" alt="Dental Logo" />
-        <img src={dental_logo2} className="logo-icon2" alt="Dental Name" />
+        <EditableCmsImage
+          src={navbar.logoIconUrl || dental_logo}
+          alt={navbar.logoIconAlt || "Dental Logo"}
+          className="logo-icon"
+          sectionKey="navbar"
+          storagePathPrefix="content-images/navbar-logoIconUrl"
+          onCommit={(url) => updateNavbarField("logoIconUrl", url)}
+          fieldRef={{ ...navbarFieldRef("logoIconUrl"), isImage: true }}
+        />
+        <EditableCmsImage
+          src={navbar.logoTextUrl || dental_logo2}
+          alt={navbar.logoTextAlt || "Dental Name"}
+          className="logo-icon2"
+          sectionKey="navbar"
+          storagePathPrefix="content-images/navbar-logoTextUrl"
+          onCommit={(url) => updateNavbarField("logoTextUrl", url)}
+          fieldRef={{ ...navbarFieldRef("logoTextUrl"), isImage: true }}
+        />
 
         <span className="logo-tooltip">
           <FaHome className="logo-tooltip-icon" />
@@ -193,7 +237,16 @@ export default function Navbar() {
           }`}
           onClick={() => scrollToSection("services")}
         >
-          Services
+          <EditableCmsField
+            as="span"
+            type="text"
+            value={navbar.servicesLabel}
+            onCommit={(value) => updateNavbarField("servicesLabel", value)}
+            sectionKey="navbar"
+            ariaLabel="Edit Services nav label"
+            styleValue={navbar.servicesLabelStyle}
+            fieldRef={navbarFieldRef("servicesLabel")}
+          />
         </li>
 
         <li
@@ -202,7 +255,16 @@ export default function Navbar() {
           }`}
           onClick={() => scrollToSection("about")}
         >
-          About
+          <EditableCmsField
+            as="span"
+            type="text"
+            value={navbar.aboutLabel}
+            onCommit={(value) => updateNavbarField("aboutLabel", value)}
+            sectionKey="navbar"
+            ariaLabel="Edit About nav label"
+            styleValue={navbar.aboutLabelStyle}
+            fieldRef={navbarFieldRef("aboutLabel")}
+          />
         </li>
 
         <li
@@ -211,7 +273,16 @@ export default function Navbar() {
           }`}
           onClick={() => scrollToSection("reviews")}
         >
-          Benefits
+          <EditableCmsField
+            as="span"
+            type="text"
+            value={navbar.benefitsLabel}
+            onCommit={(value) => updateNavbarField("benefitsLabel", value)}
+            sectionKey="navbar"
+            ariaLabel="Edit Benefits nav label"
+            styleValue={navbar.benefitsLabelStyle}
+            fieldRef={navbarFieldRef("benefitsLabel")}
+          />
         </li>
 
         <li
@@ -220,7 +291,16 @@ export default function Navbar() {
           }`}
           onClick={() => scrollToSection("articles")}
         >
-          Articles
+          <EditableCmsField
+            as="span"
+            type="text"
+            value={navbar.articlesLabel}
+            onCommit={(value) => updateNavbarField("articlesLabel", value)}
+            sectionKey="navbar"
+            ariaLabel="Edit Articles nav label"
+            styleValue={navbar.articlesLabelStyle}
+            fieldRef={navbarFieldRef("articlesLabel")}
+          />
         </li>
 
         <li
@@ -229,16 +309,35 @@ export default function Navbar() {
           }`}
           onClick={() => scrollToSection("contact")}
         >
-          Contact
+          <EditableCmsField
+            as="span"
+            type="text"
+            value={navbar.contactLabel}
+            onCommit={(value) => updateNavbarField("contactLabel", value)}
+            sectionKey="navbar"
+            ariaLabel="Edit Contact nav label"
+            styleValue={navbar.contactLabelStyle}
+            fieldRef={navbarFieldRef("contactLabel")}
+          />
         </li>
 
         <li
           className={`cont ${location.pathname === "/faq" ? "active" : ""}`}
-          onClick={() => setOpen(false)}
+          onClick={() => {
+            setOpen(false);
+            navigate("/faq");
+          }}
         >
-          <Link className="nav-link" to="/faq">
-            FAQ
-          </Link>
+          <EditableCmsField
+            as="span"
+            type="text"
+            value={navbar.faqLabel}
+            onCommit={(value) => updateNavbarField("faqLabel", value)}
+            sectionKey="navbar"
+            ariaLabel="Edit FAQ nav label"
+            styleValue={navbar.faqLabelStyle}
+            fieldRef={navbarFieldRef("faqLabel")}
+          />
         </li>
 
         {/* <li className="cont" onClick={() => setOpen(false)}>
@@ -251,7 +350,16 @@ export default function Navbar() {
           className="btn-primary mobile-btn"
           onClick={() => scrollToSection("contact")}
         >
-          Book Appointment
+          <EditableCmsField
+            as="span"
+            type="text"
+            value={navbar.bookLabel}
+            onCommit={(value) => updateNavbarField("bookLabel", value)}
+            sectionKey="navbar"
+            ariaLabel="Edit Book Appointment label"
+            styleValue={navbar.bookLabelStyle}
+            fieldRef={navbarFieldRef("bookLabel")}
+          />
         </button>
       </ul>
 
@@ -261,7 +369,18 @@ export default function Navbar() {
 
       <div className="nav-actions">
         <button className="slice" onClick={() => scrollToSection("contact")}>
-          <span className="text">Schedule Consultation</span>
+          <span className="text">
+            <EditableCmsField
+              as="span"
+              type="text"
+              value={navbar.scheduleLabel}
+              onCommit={(value) => updateNavbarField("scheduleLabel", value)}
+              sectionKey="navbar"
+              ariaLabel="Edit Schedule Consultation label"
+              styleValue={navbar.scheduleLabelStyle}
+              fieldRef={navbarFieldRef("scheduleLabel")}
+            />
+          </span>
         </button>
 
         <div
@@ -351,5 +470,7 @@ export default function Navbar() {
         onConfirm={handleLogout}
       />
     </nav>
+    <div className="nav-spacer" style={{ height: navHeight }} aria-hidden="true" />
+    </>
   );
 }

@@ -224,7 +224,7 @@
 
 @media (min-width: 1600px) {
   .services {
-    max-width: 1600px;
-    margin: 0 auto;
+    padding-left: calc((100% - 1456px) / 2);
+    padding-right: calc((100% - 1456px) / 2);
   }
 }

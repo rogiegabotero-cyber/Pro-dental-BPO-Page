@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FaSearch } from "react-icons/fa";
 import "../assets/Style/faq.css";
 import { defaultFaqs } from "../data/defaultContent";
 import { useCmsCollection } from "../hooks/useCmsData";
@@ -71,7 +72,7 @@ export default function FAQ() {
             <div className="faqv2__panel">
               <div className="faqv2__search">
                 <span className="faqv2__searchIcon" aria-hidden="true">
-                  Search
+                  <FaSearch />
                 </span>
                 <input
                   className="faqv2__searchInput"

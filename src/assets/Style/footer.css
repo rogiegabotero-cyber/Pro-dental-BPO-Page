@@ -303,7 +303,7 @@ background-color: #062c41;
 /* ULTRA-WIDE */
 @media (min-width: 1600px) {
   .footer {
-    max-width: 1600px;
-    margin: 0 auto;
+    padding-left: calc((100% - 1550px) / 2);
+    padding-right: calc((100% - 1550px) / 2);
   }
 }

@@ -87,9 +87,14 @@
 .faqv2__searchIcon {
   position: absolute;
   left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  color: #0f172a;
   opacity: 0.55;
   pointer-events: none;
- 
 }
 
 .faqv2__searchInput {

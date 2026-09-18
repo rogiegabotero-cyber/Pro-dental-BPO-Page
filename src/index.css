@@ -25,12 +25,22 @@ a:hover {
 body {
   margin: 0;
   min-width: 320px;
+  width: 100%;
   min-height: 100vh;
 }
 
 #root {
   width: 100%;
   min-height: 100vh;
+}
+
+img,
+svg,
+video,
+canvas,
+iframe,
+table {
+  max-width: 100%;
 }
 
 h1 {
@@ -68,4 +78,21 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+/* These wrapper divs (SectionFrame, ReorderableSlot) render on every route,
+   even outside the admin editor, but their edit-mode styling lives in the
+   lazy-loaded visualPageEditor.css. Their inert/no-op rule must live here
+   instead so the public site never sees the extra box before that CSS loads. */
+.section-frame,
+.cms-slot {
+  display: contents;
+}
+
+/* The header's <nav> is position: sticky. Some browsers lose track of a
+   sticky element's containing block when an ancestor is display: contents
+   (its invisible box confuses the sticky-constraint calculation), so this
+   one wrapper keeps a real — but otherwise unstyled — box instead. */
+.section-frame[data-section="navbar"] {
+  display: block;
 }

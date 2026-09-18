@@ -1,3 +1,31 @@
+const emptySectionStyle = () => ({ backgroundColor: "", backgroundImage: "", fontFamily: "" });
+
+export const defaultLayoutContent = {
+  order: ["hero", "services", "about", "benefits", "contact", "footer"],
+  styles: {
+    navbar: emptySectionStyle(),
+    hero: emptySectionStyle(),
+    services: emptySectionStyle(),
+    about: emptySectionStyle(),
+    benefits: emptySectionStyle(),
+    contact: emptySectionStyle(),
+    footer: emptySectionStyle(),
+  },
+};
+
+export const defaultNavbarContent = {
+  logoIconAlt: "Dental Logo",
+  logoTextAlt: "Dental Name",
+  servicesLabel: "Services",
+  aboutLabel: "About",
+  benefitsLabel: "Benefits",
+  articlesLabel: "Articles",
+  contactLabel: "Contact",
+  faqLabel: "FAQ",
+  scheduleLabel: "Schedule Consultation",
+  bookLabel: "Book Appointment",
+};
+
 export const defaultHeroContent = {
   tag: "Pro-Dental BPO",
   title: "Why Hire Pro-Dental BPO",
@@ -9,6 +37,30 @@ export const defaultHeroContent = {
   ],
   primaryButtonLabel: "Consult",
   secondaryButtonLabel: "Explore Services",
+  elementOrder: ["tag", "title", "benefits", "buttons"],
+};
+
+export const defaultServicesSectionContent = {
+  tag: "Our Services",
+  heading: "What We Offer",
+  elementOrder: ["tag", "heading"],
+};
+
+export const defaultBenefitsSectionContent = {
+  heading: "Our Benefits",
+};
+
+export const defaultFooterSectionContent = {
+  quickLinksHeading: "Quick Links",
+  navServicesLabel: "Services",
+  navAboutLabel: "About",
+  navBenefitsLabel: "Benefits",
+  navContactLabel: "Contact",
+  navFaqLabel: "FAQ",
+  navArticlesLabel: "Articles",
+  contactHeading: "Contact",
+  copyrightText: "© 2026 Pro Dental BPO. All rights reserved.",
+  elementOrder: ["logo", "quickLinks", "contactBlock", "social", "newsletter"],
 };
 
 export const defaultAboutContent = {
@@ -19,6 +71,7 @@ export const defaultAboutContent = {
     "Pro-Dental BPO bridges the gap between clinical expertise and advanced automation, empowering practitioners to optimize operations and reclaim their revenue cycles. Our dentist-designed integration is engineered to streamline workflows and recover lost capital.",
     "By providing the essential bandwidth through independent suites built for dentists, by a dentist, we allow you to focus on what matters most: your patients.",
   ],
+  elementOrder: ["tag", "title", "paragraphs"],
 };
 
 export const defaultContactContent = {
@@ -33,6 +86,7 @@ export const defaultContactContent = {
   formTitle: "Schedule a Consultation",
   successMessage:
     "Consultation request sent successfully. We will contact you soon.",
+  elementOrder: ["tag", "title", "body", "details"],
 };
 
 export const defaultSettingsContent = {

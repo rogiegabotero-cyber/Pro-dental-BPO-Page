@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  EmailAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   getIdToken,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updatePassword,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { AuthContext } from "./AuthContext";
 import { auth, db } from "../firebase";
 import { saveArticleSubscriber } from "../services/articleSubscriberService";
@@ -18,6 +21,7 @@ export function AuthProvider({ children }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminProfile, setAdminProfile] = useState(null);
   const [adminCheckError, setAdminCheckError] = useState("");
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -29,6 +33,7 @@ export function AuthProvider({ children }) {
       if (!nextUser) {
         setIsAdmin(false);
         setAdminProfile(null);
+        setMustChangePassword(false);
         setLoading(false);
         return;
       }
@@ -63,11 +68,15 @@ export function AuthProvider({ children }) {
             ? { uid: nextUser.uid, ...adminSnapshot.data() }
             : null
         );
+
+        const subscriberSnapshot = await getDoc(doc(db, "articleSubscribers", nextUser.uid));
+        setMustChangePassword(Boolean(subscriberSnapshot.data()?.mustChangePassword));
       } catch (error) {
         console.error("Admin check failed:", error);
         setAdminCheckError(error.message || "Unable to read the admin document.");
         setIsAdmin(false);
         setAdminProfile(null);
+        setMustChangePassword(false);
       } finally {
         setLoading(false);
       }
@@ -75,6 +84,24 @@ export function AuthProvider({ children }) {
 
     return unsubscribe;
   }, []);
+
+  const completeForcedPasswordChange = async (currentPassword, newPassword) => {
+    const currentUser = auth.currentUser;
+
+    if (!currentUser?.email) {
+      throw new Error("We could not find your email address for this account.");
+    }
+
+    const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+    await reauthenticateWithCredential(currentUser, credential);
+    await updatePassword(currentUser, newPassword);
+    await setDoc(
+      doc(db, "articleSubscribers", currentUser.uid),
+      { mustChangePassword: false, passwordChangedAt: serverTimestamp() },
+      { merge: true }
+    );
+    setMustChangePassword(false);
+  };
 
   const value = useMemo(
     () => ({
@@ -90,13 +117,15 @@ export function AuthProvider({ children }) {
             ? "admin"
             : "user",
       adminCheckError,
+      mustChangePassword,
       loading,
       login: (email, password) => signInWithEmailAndPassword(auth, email, password),
       signup: (email, password) => createUserWithEmailAndPassword(auth, email, password),
       loginWithGoogle: () => signInWithPopup(auth, new GoogleAuthProvider()),
       logout: () => signOut(auth),
+      completeForcedPasswordChange,
     }),
-    [user, isAdmin, adminProfile, adminCheckError, loading]
+    [user, isAdmin, adminProfile, adminCheckError, mustChangePassword, loading]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
