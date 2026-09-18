@@ -160,10 +160,9 @@ function App() {
                 />
                 <Route path="faq" element={<CollectionEditor configKey="faqs" />} />
                 <Route path="about" element={<SiteContentEditor configKey="about" />} />
-                <Route
-                  path="contact"
-                  element={<SiteContentEditor configKey="contact" />}
-                />
+                {/* Contact is now edited on the Settings page, alongside site
+                    settings — redirect any old links/bookmarks there. */}
+                <Route path="contact" element={<Navigate to="/admin/settings" replace />} />
                 <Route
                   path="settings"
                   element={<SiteContentEditor configKey="settings" />}

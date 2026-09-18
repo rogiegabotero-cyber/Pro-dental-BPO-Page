@@ -63,7 +63,7 @@ const SECTION_EDIT_ROUTES = {
   services: "/admin/services",
   about: "/admin/about",
   benefits: "/admin/benefits",
-  contact: "/admin/contact",
+  contact: "/admin/settings",
   footer: "/admin/settings",
 };
 
@@ -1594,7 +1594,11 @@ export default function VisualPageEditor() {
           </aside>
         </div>
 
-        <nav className="layout-editor-filmstrip" aria-label="Jump to a section">
+        <nav
+          className={`layout-editor-filmstrip${editMode ? "" : " is-disabled"}`}
+          aria-label="Jump to a section"
+          aria-disabled={!editMode}
+        >
           {quickJumpKeys.map((key, index) => (
             <button
               key={key}

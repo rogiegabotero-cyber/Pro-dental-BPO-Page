@@ -379,6 +379,14 @@
   scrollbar-color: rgba(11, 143, 158, 0.35) transparent;
 }
 
+/* Only useful once there's a page to jump around while editing — stays
+   visible outside edit mode, just inert and dimmed, like the style panel. */
+.layout-editor-filmstrip.is-disabled {
+  pointer-events: none;
+  opacity: 0.4;
+  filter: grayscale(0.3);
+}
+
 .layout-editor-filmstrip::-webkit-scrollbar {
   width: 8px;
   height: 8px;

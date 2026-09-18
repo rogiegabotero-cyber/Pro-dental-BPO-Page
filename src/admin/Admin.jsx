@@ -45,6 +45,9 @@ import {
   FaQuestion,
   FaSignOutAlt,
   FaTimes,
+  FaTrash,
+  FaUserMinus,
+  FaUserShield,
   FaUsers,
 } from "react-icons/fa";
 import { useAuth } from "../auth/useAuth";
@@ -52,6 +55,7 @@ import { AdminShellContext } from "./AdminShellContext";
 import { coerceValue, fieldToInputValue } from "../utils/cmsFieldTypes";
 import { db, functions, storage } from "../firebase";
 import LogoutConfirmModal from "../components/LogoutConfirmModal";
+import ConfirmActionModal from "../components/ConfirmActionModal";
 import AdminResetPasswordModal from "../components/AdminResetPasswordModal";
 import AdminResetPasswordDownloadModal from "../components/AdminResetPasswordDownloadModal";
 import ArticleDeleteConfirmModal from "../components/ArticleDeleteConfirmModal";
@@ -425,13 +429,14 @@ function TrendChart({ series }) {
           {yTicks.map((tick, index) => {
             const y = padding.top + chartHeight - chartHeight * tick;
             return (
-              <g key={`grid-${tick}`}>
+              <g key={`grid-${tick}`} className="admin-trend-chart__grid-group">
                 <line
                   x1={padding.left}
                   x2={width - padding.right}
                   y1={y}
                   y2={y}
                   className={`admin-trend-chart__grid${index === yTicks.length - 1 ? " admin-trend-chart__grid--base" : ""}`}
+                  style={{ animationDelay: `${index * 60}ms` }}
                 />
                 <text x={10} y={y + 4} className="admin-trend-chart__axis-label">
                   {tickValues[index]}
@@ -440,9 +445,21 @@ function TrendChart({ series }) {
             );
           })}
 
-          {linePath && <path d={linePath} className="admin-trend-chart__line" />}
+          {/* Keying on the path itself forces a fresh <path> node (instead of
+              React patching the `d` attribute in place) whenever the traffic
+              range changes, so the draw-in animation replays for new data
+              instead of only ever playing once on mount. */}
+          {linePath && (
+            <path
+              key={linePath}
+              d={linePath}
+              pathLength="1"
+              className="admin-trend-chart__line"
+            />
+          )}
           {tooltipPoint && (
             <circle
+              key={`${tooltipPoint.id}-${tooltipPoint.value}`}
               cx={tooltipPoint.x}
               cy={tooltipPoint.y}
               r="3.1"
@@ -1435,7 +1452,7 @@ export function AdminDashboard() {
           total={consultations.length}
           totalLabel="booked"
           actions={
-            <Link className="admin-secondary" to="/admin/contact#consultation-review">
+            <Link className="admin-secondary" to="/admin/settings#consultation-review">
               Open review
             </Link>
           }
@@ -1459,7 +1476,7 @@ export function AdminDashboard() {
                     <Link
                       key={item.id}
                       className="admin-consultation-preview__item"
-                      to="/admin/contact#consultation-review"
+                      to="/admin/settings#consultation-review"
                     >
                       <div className="admin-consultation-preview__copy">
                         <strong>{item.email || "No email supplied"}</strong>
@@ -1556,7 +1573,8 @@ export function AdminUsersPage() {
   const { isOwner, user } = useAuth();
   const [admins, setAdmins] = useState([]);
   const [subscribers, setSubscribers] = useState([]);
-  const [selectedSubscriberId, setSelectedSubscriberId] = useState("");
+  const [activeTab, setActiveTab] = useState("admins");
+  const [showAddForm, setShowAddForm] = useState(false);
   const [draft, setDraft] = useState({ uid: "", email: "", role: "admin" });
   const [message, setMessage] = useState("");
   const [resetTarget, setResetTarget] = useState(null);
@@ -1565,6 +1583,8 @@ export function AdminUsersPage() {
   const [resetError, setResetError] = useState("");
   const [resetSaving, setResetSaving] = useState(false);
   const [resetResult, setResetResult] = useState(null);
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [confirmSaving, setConfirmSaving] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "admins"), (snapshot) => {
@@ -1591,14 +1611,6 @@ export function AdminUsersPage() {
     [admins]
   );
 
-  const selectedSubscriber = useMemo(
-    () =>
-      subscribers.find((subscriber) => subscriber.id === selectedSubscriberId) ||
-      subscribers.find((subscriber) => subscriber.authUid === selectedSubscriberId) ||
-      null,
-    [selectedSubscriberId, subscribers]
-  );
-
   const sortedAdmins = useMemo(() => {
     return [...admins].sort((left, right) => {
       const leftLabel = (left.email || left.uid || "").toLowerCase();
@@ -1617,28 +1629,39 @@ export function AdminUsersPage() {
 
   if (!isOwner) {
     return (
-      <section className="admin-page">
+      <section className="admin-page admin-users-page">
         <div className="admin-page-header">
-          <span>Owner Only</span>
-          <h1>Admins</h1>
-          <p>Only the owner can add or remove admin users.</p>
+          <div>
+            <span>Owner Only</span>
+            <h1>Team &amp; Access</h1>
+            <p>Only the owner can view or manage admin accounts.</p>
+          </div>
         </div>
       </section>
     );
   }
 
-  const handleSelectSubscriber = (subscriber) => {
+  const handleQuickPromote = async (subscriber) => {
     const uid = subscriber.authUid || subscriber.uid || subscriber.id || "";
     const email = subscriber.email || "";
-    const role = adminByUid.get(uid)?.role || "admin";
 
-    setSelectedSubscriberId(subscriber.id || uid);
-    setDraft({
-      uid,
-      email,
-      role,
-    });
-    setMessage(`Loaded ${email || uid} into the admin form.`);
+    if (!uid) {
+      setMessage("This user has no Firebase UID on file.");
+      return;
+    }
+
+    setMessage("");
+
+    try {
+      await setDoc(
+        doc(db, "admins", uid),
+        { email: email.trim().toLowerCase(), role: "admin", updatedAt: serverTimestamp() },
+        { merge: true }
+      );
+      setMessage(`${email || uid} is now an admin.`);
+    } catch (error) {
+      setMessage(error.message || "Unable to save admin.");
+    }
   };
 
   const handleSubmit = async (event) => {
@@ -1657,7 +1680,6 @@ export function AdminUsersPage() {
       );
       setDraft({ uid: "", email: "", role: "admin" });
       setMessage("Admin saved.");
-      setSelectedSubscriberId("");
     } catch (error) {
       setMessage(error.message || "Unable to save admin.");
     }
@@ -1667,7 +1689,7 @@ export function AdminUsersPage() {
     const targetUid = String(draft.uid || "").trim();
 
     if (!targetUid) {
-      setMessage("Select a user before removing a role.");
+      setMessage("Enter a UID before removing a role.");
       return;
     }
 
@@ -1682,10 +1704,33 @@ export function AdminUsersPage() {
       await deleteDoc(doc(db, "admins", targetUid));
       setMessage("Admin role removed.");
       setDraft({ uid: "", email: "", role: "admin" });
-      setSelectedSubscriberId("");
     } catch (error) {
       setMessage(error.message || "Unable to remove the role.");
     }
+  };
+
+  const handleRemoveAdmin = async (uid) => {
+    setMessage("");
+
+    try {
+      await deleteDoc(doc(db, "admins", uid));
+      setMessage("Admin access removed.");
+    } catch (error) {
+      setMessage(error.message || "Unable to remove admin access.");
+    }
+  };
+
+  const closeConfirmAction = () => {
+    if (confirmSaving) return;
+    setConfirmAction(null);
+  };
+
+  const runConfirmedAction = async () => {
+    if (!confirmAction) return;
+    setConfirmSaving(true);
+    await confirmAction.run();
+    setConfirmSaving(false);
+    setConfirmAction(null);
   };
 
   const openResetPassword = (target) => {
@@ -1799,148 +1844,252 @@ export function AdminUsersPage() {
     doc.save(`pro-dental-bpo-credentials-${resetResult.email || resetResult.uid}.pdf`);
   };
 
+  const renderRoleBadge = (role) => (
+    <span className={`admin-users-badge admin-users-badge--${role}`}>{role}</span>
+  );
+
   return (
-    <section className="admin-page">
-      <div className="admin-page-header">
-        <div>
-          <span>Access</span>
-          <h1>Users</h1>
-          <p>Pick a logged-in user, load their details into the form, then assign a role.</p>
-        </div>
+    <section className="admin-page admin-users-page">
+      <div className="admin-users-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "admins"}
+          className={`admin-users-tab${activeTab === "admins" ? " is-active" : ""}`}
+          onClick={() => setActiveTab("admins")}
+        >
+          Admins
+          <span className="admin-users-tab__count">{admins.length}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "users"}
+          className={`admin-users-tab${activeTab === "users" ? " is-active" : ""}`}
+          onClick={() => setActiveTab("users")}
+        >
+          All Users
+          <span className="admin-users-tab__count">{subscribers.length}</span>
+        </button>
       </div>
 
-      <section className="admin-panel">
-        <div className="admin-list-header">
-          <div>
-            <span>Live list</span>
-            <h2>Logged-in users</h2>
-          </div>
-          <p>These are the accounts that have signed in and written their profile records.</p>
-        </div>
-        <div className="admin-list">
-          {sortedSubscribers.length === 0 ? (
-            <p className="admin-empty">No logged-in users yet.</p>
-          ) : (
-            sortedSubscribers.map((subscriber) => {
-              const uid = subscriber.authUid || subscriber.uid || subscriber.id;
-              const adminRecord = adminByUid.get(uid);
-              const isSelected = selectedSubscriberId === subscriber.id || selectedSubscriberId === uid;
-              const label = subscriber.displayName || subscriber.email || uid;
+      {message && <p className="admin-message admin-users-message">{message}</p>}
 
-              return (
-                <article
-                  className={`admin-list-item${isSelected ? " admin-list-item--selected" : ""}`}
-                  key={subscriber.id}
-                >
-                  <div>
-                    <h3>{label}</h3>
-                    <p>{subscriber.email || uid}</p>
-                    <span>{adminRecord?.role || subscriber.status || "user"}</span>
-                  </div>
-                  <div className="admin-row-actions">
-                    <button type="button" onClick={() => handleSelectSubscriber(subscriber)}>
-                      {isSelected ? "Loaded" : "Load"}
-                    </button>
-                    <button
-                      type="button"
-                      className="admin-secondary"
-                      onClick={() => openResetPassword({ uid, email: subscriber.email || "" })}
-                      disabled={!uid}
-                    >
-                      <FaKey aria-hidden="true" /> Reset Password
-                    </button>
-                  </div>
-                </article>
-              );
-            })
-          )}
-        </div>
-      </section>
-
-      <div className="admin-two-column">
-        <form className="admin-form" onSubmit={handleSubmit}>
-          {selectedSubscriber && (
-            <div className="admin-note">
-              <strong>Selected user</strong>
-              <p>
-                {selectedSubscriber.displayName || selectedSubscriber.email || selectedSubscriber.id}
-              </p>
+      {activeTab === "admins" && (
+        <section className="admin-panel admin-users-panel">
+          <div className="admin-list-header">
+            <div>
+              <span>Access</span>
+              <h2>Admins</h2>
             </div>
-          )}
-          <label>
-            Firebase Auth UID
-            <input
-              value={draft.uid}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, uid: event.target.value }))
-              }
-              required
-            />
-          </label>
-          <label>
-            Email
-            <input
-              type="email"
-              value={draft.email}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, email: event.target.value }))
-              }
-            />
-          </label>
-          <label>
-            Role
-            <select
-              value={draft.role}
-              onChange={(event) =>
-                setDraft((current) => ({ ...current, role: event.target.value }))
-              }
-            >
-              <option value="admin">Admin</option>
-              <option value="owner">Owner</option>
-            </select>
-          </label>
-          {message && <p className="admin-message">{message}</p>}
-          <div className="admin-actions">
-            <button type="submit">Save Admin</button>
-            <button
-              type="button"
-              className="admin-secondary"
-              onClick={handleRemoveRole}
-              disabled={!draft.uid || draft.uid.trim() === user?.uid}
-            >
-              Remove Role
+            <button type="button" className="admin-secondary" onClick={() => setShowAddForm(true)}>
+              <FaPlus aria-hidden="true" /> Add by UID
             </button>
           </div>
-        </form>
 
-        <div className="admin-list">
-          {admins.map((admin) => (
-            <article className="admin-list-item" key={admin.uid}>
-              <div>
-                <h3>{admin.email || admin.uid}</h3>
-                <p>{admin.uid}</p>
-                <span>{admin.role || "admin"}</span>
-              </div>
-              <div className="admin-row-actions">
+          {showAddForm && (
+            <button
+              type="button"
+              className="admin-drawer-backdrop"
+              aria-label="Close"
+              onClick={() => setShowAddForm(false)}
+            />
+          )}
+
+          <aside
+            className={`admin-drawer${showAddForm ? " admin-drawer--open" : ""}`}
+            aria-hidden={!showAddForm}
+          >
+            <div className="admin-drawer__header">
+              <h2>Add admin by UID</h2>
+              <button
+                type="button"
+                className="admin-drawer__close"
+                onClick={() => setShowAddForm(false)}
+                aria-label="Close"
+              >
+                <FaTimes aria-hidden="true" />
+              </button>
+            </div>
+            <form className="admin-form admin-users-add-form" onSubmit={handleSubmit}>
+              <p className="admin-users-add-form__hint">
+                For promoting someone who hasn't signed in yet, or assigning the owner role.
+                Everyone else can be promoted with one click from the All Users tab.
+              </p>
+              <label>
+                Firebase Auth UID
+                <input
+                  value={draft.uid}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, uid: event.target.value }))
+                  }
+                  required
+                />
+              </label>
+              <label>
+                Email
+                <input
+                  type="email"
+                  value={draft.email}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, email: event.target.value }))
+                  }
+                />
+              </label>
+              <label>
+                Role
+                <select
+                  value={draft.role}
+                  onChange={(event) =>
+                    setDraft((current) => ({ ...current, role: event.target.value }))
+                  }
+                >
+                  <option value="admin">Admin</option>
+                  <option value="owner">Owner</option>
+                </select>
+              </label>
+              <div className="admin-actions">
+                <button type="submit">Save Admin</button>
                 <button
                   type="button"
                   className="admin-secondary"
-                  onClick={() => openResetPassword({ uid: admin.uid, email: admin.email || "" })}
+                  disabled={!draft.uid || draft.uid.trim() === user?.uid}
+                  onClick={() =>
+                    setConfirmAction({
+                      icon: <FaUserMinus aria-hidden="true" />,
+                      title: "Remove this admin role?",
+                      description: `The account with UID "${draft.uid.trim()}" will lose admin access.`,
+                      confirmLabel: "Remove role",
+                      danger: true,
+                      run: handleRemoveRole,
+                    })
+                  }
                 >
-                  <FaKey aria-hidden="true" /> Reset Password
-                </button>
-                <button
-                  type="button"
-                  disabled={admin.uid === user?.uid}
-                  onClick={() => deleteDoc(doc(db, "admins", admin.uid))}
-                >
-                  Remove
+                  Remove Role
                 </button>
               </div>
-            </article>
-          ))}
-        </div>
-      </div>
+            </form>
+          </aside>
+
+          <div className="admin-users-list">
+            {sortedAdmins.length === 0 ? (
+              <p className="admin-empty">No admins yet.</p>
+            ) : (
+              sortedAdmins.map((admin) => (
+                <article className="admin-users-row" key={admin.uid}>
+                  <span className="admin-users-avatar" aria-hidden="true">
+                    {(admin.email || admin.uid || "?").charAt(0).toUpperCase()}
+                  </span>
+                  <div className="admin-users-row__identity">
+                    <strong>{admin.email || admin.uid}</strong>
+                    <small>{admin.uid}</small>
+                  </div>
+                  {renderRoleBadge(admin.role || "admin")}
+                  <div className="admin-users-row__actions">
+                    <button
+                      type="button"
+                      className="admin-users-icon-button"
+                      title="Reset password"
+                      aria-label="Reset password"
+                      onClick={() => openResetPassword({ uid: admin.uid, email: admin.email || "" })}
+                    >
+                      <FaKey aria-hidden="true" />
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-users-icon-button admin-users-icon-button--danger"
+                      title="Remove admin access"
+                      aria-label="Remove admin access"
+                      disabled={admin.uid === user?.uid}
+                      onClick={() =>
+                        setConfirmAction({
+                          icon: <FaUserMinus aria-hidden="true" />,
+                          title: "Remove admin access?",
+                          description: `${admin.email || admin.uid} will no longer be able to sign in to the admin panel.`,
+                          confirmLabel: "Remove access",
+                          danger: true,
+                          run: () => handleRemoveAdmin(admin.uid),
+                        })
+                      }
+                    >
+                      <FaTimes aria-hidden="true" />
+                    </button>
+                  </div>
+                </article>
+              ))
+            )}
+          </div>
+        </section>
+      )}
+
+      {activeTab === "users" && (
+        <section className="admin-panel admin-users-panel">
+          <div className="admin-list-header">
+            <div>
+              <span>Directory</span>
+              <h2>All Users</h2>
+            </div>
+            <p>Everyone who has signed in and created a profile record.</p>
+          </div>
+
+          <div className="admin-users-list">
+            {sortedSubscribers.length === 0 ? (
+              <p className="admin-empty">No logged-in users yet.</p>
+            ) : (
+              sortedSubscribers.map((subscriber) => {
+                const uid = subscriber.authUid || subscriber.uid || subscriber.id;
+                const adminRecord = adminByUid.get(uid);
+                const label = subscriber.displayName || subscriber.email || uid;
+                const role = adminRecord?.role || "user";
+
+                return (
+                  <article className="admin-users-row" key={subscriber.id}>
+                    <span className="admin-users-avatar" aria-hidden="true">
+                      {(label || "?").charAt(0).toUpperCase()}
+                    </span>
+                    <div className="admin-users-row__identity">
+                      <strong>{label}</strong>
+                      <small>{subscriber.email || uid}</small>
+                    </div>
+                    {renderRoleBadge(role)}
+                    <div className="admin-users-row__actions">
+                      {!adminRecord && (
+                        <button
+                          type="button"
+                          className="admin-users-text-button"
+                          disabled={!uid}
+                          onClick={() =>
+                            setConfirmAction({
+                              icon: <FaUserShield aria-hidden="true" />,
+                              title: "Make this user an admin?",
+                              description: `${label} will be able to sign in to the admin panel and manage site content.`,
+                              confirmLabel: "Make admin",
+                              danger: false,
+                              run: () => handleQuickPromote(subscriber),
+                            })
+                          }
+                        >
+                          Make admin
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="admin-users-icon-button"
+                        title="Reset password"
+                        aria-label="Reset password"
+                        onClick={() => openResetPassword({ uid, email: subscriber.email || "" })}
+                        disabled={!uid}
+                      >
+                        <FaKey aria-hidden="true" />
+                      </button>
+                    </div>
+                  </article>
+                );
+              })
+            )}
+          </div>
+        </section>
+      )}
 
       <AdminResetPasswordModal
         isOpen={resetStage === "confirm"}
@@ -1960,6 +2109,18 @@ export function AdminUsersPage() {
         password={resetResult?.password || ""}
         onDownload={handleDownloadCredentials}
         onClose={closeResetPassword}
+      />
+
+      <ConfirmActionModal
+        isOpen={Boolean(confirmAction)}
+        icon={confirmAction?.icon}
+        title={confirmAction?.title || ""}
+        description={confirmAction?.description || ""}
+        confirmLabel={confirmAction?.confirmLabel}
+        danger={confirmAction?.danger}
+        loading={confirmSaving}
+        onCancel={closeConfirmAction}
+        onConfirm={runConfirmedAction}
       />
     </section>
   );
@@ -2630,9 +2791,11 @@ export function ArticlesAdminPage() {
   );
 }
 
-export function SiteContentEditor({ configKey }) {
+// One doc's worth of fields (the actual form) — extracted so the Settings
+// page can render both the settings doc and the contact doc side by side
+// without duplicating all this state/save logic.
+function SiteContentFields({ configKey, heading }) {
   const config = siteContentConfigs[configKey];
-  const location = useLocation();
   const usesFieldActions = true;
   const [form, setForm] = useState(config.fallback);
   const [savedForm, setSavedForm] = useState(config.fallback);
@@ -2652,23 +2815,6 @@ export function SiteContentEditor({ configKey }) {
 
     return unsubscribe;
   }, [config]);
-
-  useEffect(() => {
-    if (configKey !== "contact" || location.hash !== "#consultation-review") {
-      return;
-    }
-
-    const element = document.getElementById("consultation-review");
-    if (!element) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [configKey, location.hash]);
 
   const handleSave = async (event) => {
     event.preventDefault();
@@ -2750,15 +2896,8 @@ export function SiteContentEditor({ configKey }) {
   };
 
   return (
-    <section className="admin-page">
-      <div className="admin-page-header">
-        <Link className="admin-back-link" to="/admin/page-content">
-          <FaArrowLeft aria-hidden="true" />
-          <span className="sr-only">Back to Page Content</span>
-        </Link>
-        <span>Site Content</span>
-        <h1>{config.title}</h1>
-      </div>
+    <div className="admin-site-content-fields">
+      {heading && <h2>{heading}</h2>}
       <form className="admin-form" onSubmit={handleSave}>
         {config.fields.map((field) => (
           <AdminField
@@ -2792,7 +2931,58 @@ export function SiteContentEditor({ configKey }) {
           </button>
         )}
       </form>
-      {configKey === "contact" && <ConsultationsPanel />}
+    </div>
+  );
+}
+
+// Settings and Contact are edited on the same page (the site's contact
+// details naturally belong with its other settings), but they still save
+// to their own separate siteContent docs — Contact.jsx on the public site
+// reads its own "contact" doc directly, so merging the docs themselves
+// would break that, not just the admin UI.
+export function SiteContentEditor({ configKey }) {
+  const config = siteContentConfigs[configKey];
+  const location = useLocation();
+  const isSettingsPage = configKey === "settings";
+
+  useEffect(() => {
+    if (!isSettingsPage || location.hash !== "#consultation-review") {
+      return;
+    }
+
+    const element = document.getElementById("consultation-review");
+    if (!element) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      element.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [isSettingsPage, location.hash]);
+
+  return (
+    <section className="admin-page">
+      <div className="admin-page-header">
+        <Link className="admin-back-link" to="/admin/page-content">
+          <FaArrowLeft aria-hidden="true" />
+          <span className="sr-only">Back to Page Content</span>
+        </Link>
+        <span>Site Content</span>
+        <h1>{config.title}</h1>
+      </div>
+
+      {isSettingsPage ? (
+        <div className="admin-site-content-grid">
+          <SiteContentFields configKey="settings" heading="Site Settings" />
+          <SiteContentFields configKey="contact" heading="Contact" />
+        </div>
+      ) : (
+        <SiteContentFields configKey={configKey} />
+      )}
+
+      {isSettingsPage && <ConsultationsPanel />}
     </section>
   );
 }
@@ -2907,6 +3097,8 @@ export function CollectionEditor({ configKey }) {
   const [savingFields, setSavingFields] = useState({});
   const [message, setMessage] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const collectionQuery = query(
@@ -2993,8 +3185,24 @@ export function CollectionEditor({ configKey }) {
     resetDraft();
   };
 
-  const handleDelete = async (id) => {
-    await deleteDoc(doc(db, config.collectionName, id));
+  const requestDelete = (item) => {
+    setDeleteTarget(item);
+  };
+
+  const cancelDelete = () => {
+    if (deleting) return;
+    setDeleteTarget(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, config.collectionName, deleteTarget.id));
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
   };
 
   const handleFieldEdit = (fieldName) => {
@@ -3103,7 +3311,7 @@ export function CollectionEditor({ configKey }) {
               <button type="button" onClick={() => handleEdit(item)}>
                 Edit
               </button>
-              <button type="button" onClick={() => handleDelete(item.id)}>
+              <button type="button" onClick={() => requestDelete(item)}>
                 Delete
               </button>
             </div>
@@ -3115,7 +3323,11 @@ export function CollectionEditor({ configKey }) {
 
   return (
     <section className="admin-page">
-      <div className={`admin-page-header${isFaqCollection ? " admin-page-header--faq" : ""}`}>
+      <div
+        className={`admin-page-header${
+          isFaqCollection ? " admin-page-header--with-drawer-trigger" : ""
+        }`}
+      >
         <Link className="admin-back-link" to="/admin/page-content">
           <FaArrowLeft aria-hidden="true" />
           <span className="sr-only">Back to Page Content</span>
@@ -3125,7 +3337,7 @@ export function CollectionEditor({ configKey }) {
         {isFaqCollection && (
           <button
             type="button"
-            className="admin-faq-add-button"
+            className="admin-drawer-trigger"
             onClick={handleAddNew}
             aria-label="Add FAQ"
             title="Add FAQ"
@@ -3142,21 +3354,21 @@ export function CollectionEditor({ configKey }) {
           {drawerOpen && (
             <button
               type="button"
-              className="admin-faq-drawer-backdrop"
+              className="admin-drawer-backdrop"
               aria-label="Close"
               onClick={closeDrawer}
             />
           )}
 
           <aside
-            className={`admin-faq-drawer${drawerOpen ? " admin-faq-drawer--open" : ""}`}
+            className={`admin-drawer${drawerOpen ? " admin-drawer--open" : ""}`}
             aria-hidden={!drawerOpen}
           >
-            <div className="admin-faq-drawer__header">
+            <div className="admin-drawer__header">
               <h2>{editingId ? "Edit item" : "Add item"}</h2>
               <button
                 type="button"
-                className="admin-faq-drawer__close"
+                className="admin-drawer__close"
                 onClick={closeDrawer}
                 aria-label="Close"
               >
@@ -3182,6 +3394,20 @@ export function CollectionEditor({ configKey }) {
           {listMarkup}
         </div>
       )}
+
+      <ConfirmActionModal
+        isOpen={Boolean(deleteTarget)}
+        icon={<FaTrash aria-hidden="true" />}
+        title="Delete this item?"
+        description={`"${
+          deleteTarget?.title || deleteTarget?.question || deleteTarget?.category || "This item"
+        }" will be permanently removed.`}
+        confirmLabel="Delete"
+        danger
+        loading={deleting}
+        onCancel={cancelDelete}
+        onConfirm={confirmDelete}
+      />
     </section>
   );
 }
@@ -3229,21 +3455,19 @@ function ConsultationsPanel() {
   );
 
   const selectedConsultation = useMemo(
-    () =>
-      filteredItems.find((item) => item.id === selectedConsultationId) ||
-      filteredItems[0] ||
-      null,
+    () => filteredItems.find((item) => item.id === selectedConsultationId) || null,
     [filteredItems, selectedConsultationId]
   );
 
+  // Unlike the old auto-pick-the-first-item behavior, the detail panel now
+  // stays closed until a queue item is actually clicked — this only clears
+  // the selection if it's no longer valid (e.g. switching filters away from
+  // the selected item's status), it never picks a new one on its own.
   useEffect(() => {
-    if (filteredItems.length === 0) {
-      setSelectedConsultationId("");
-      return;
-    }
+    if (!selectedConsultationId) return;
 
     if (!filteredItems.some((item) => item.id === selectedConsultationId)) {
-      setSelectedConsultationId(filteredItems[0].id);
+      setSelectedConsultationId("");
     }
   }, [filteredItems, selectedConsultationId]);
 
@@ -3407,6 +3631,9 @@ function ConsultationsPanel() {
           )}
         </div>
 
+        <div
+          className={`admin-consultation-drawer-wrap${selectedConsultation ? " is-open" : ""}`}
+        >
         <aside className="admin-consultation-drawer">
           {selectedConsultation ? (
             <>
@@ -3518,12 +3745,9 @@ function ConsultationsPanel() {
                 </button>
               </div>
             </>
-          ) : (
-            <div className="admin-consultation-drawer__empty">
-              <p className="admin-empty">Select a consultation to review its details.</p>
-            </div>
-          )}
+          ) : null}
         </aside>
+        </div>
       </div>
     </section>
   );
