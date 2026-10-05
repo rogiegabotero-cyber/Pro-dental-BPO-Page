@@ -96,3 +96,11 @@ button:focus-visible {
 .section-frame[data-section="navbar"] {
   display: block;
 }
+
+
+/* Sections the admin chose to hide on phones (see the page editor mobile settings). */
+@media (max-width: 768px) {
+  [data-hide-mobile="true"] {
+    display: none !important;
+  }
+}

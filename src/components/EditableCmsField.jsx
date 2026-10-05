@@ -1,6 +1,8 @@
-import { cloneElement, createElement, useRef, useState } from "react";
+import { cloneElement, createElement, useContext, useRef, useState } from "react";
 import { FaImage } from "react-icons/fa";
 import { useLayoutEditorContext } from "../context/LayoutEditorContext";
+import { MobileSettingsContext } from "../context/MobileSettingsContext";
+import { mobileFieldKey } from "../hooks/useMobileSettings";
 import { coerceValue, fieldToInputValue } from "../utils/cmsFieldTypes";
 import { uploadCmsImage } from "../utils/cmsImageUpload";
 import { buildSpacingStyle } from "../utils/spacing";
@@ -36,6 +38,11 @@ export function EditableCmsField({
   const [draftValue, setDraftValue] = useState("");
 
   const resolvedStyle = buildFieldStyle(styleValue);
+  const mobileFields = useContext(MobileSettingsContext);
+  const mobileHidden = Boolean(fieldRef && mobileFields?.hiddenFields?.[mobileFieldKey(fieldRef)]);
+  // Public site / preview: hidden by CSS on phones. Editable device frame:
+  // dimmed instead, so the element can still be selected and un-hidden.
+  const dimHidden = mobileHidden && Boolean(ctx?.deviceFrame);
   const isListType = type === "lines" || type === "blocks";
 
   const buildView = () =>
@@ -44,7 +51,10 @@ export function EditableCmsField({
       : createElement(as, { className, style: resolvedStyle }, value);
 
   if (!ctx?.editMode) {
-    return buildView();
+    const plainView = buildView();
+    return mobileHidden && !ctx
+      ? cloneElement(plainView, { "data-hide-mobile": "true" })
+      : plainView;
   }
 
   const selectThisField = () => {
@@ -93,7 +103,9 @@ export function EditableCmsField({
     const view = buildView();
 
     return cloneElement(view, {
-      className: ["cms-editable-field", view.props.className, className].filter(Boolean).join(" "),
+      className: ["cms-editable-field", view.props.className, className, dimHidden && "cms-mobile-hidden"]
+        .filter(Boolean)
+        .join(" "),
       style: { ...view.props.style, ...resolvedStyle },
       "data-cms-interactive": "true",
       "aria-label": ariaLabel,
@@ -137,7 +149,9 @@ export function EditableCmsField({
   const view = buildView();
 
   return cloneElement(view, {
-    className: ["cms-editable-field", view.props.className, className].filter(Boolean).join(" "),
+    className: ["cms-editable-field", view.props.className, className, dimHidden && "cms-mobile-hidden"]
+        .filter(Boolean)
+        .join(" "),
     style: { ...view.props.style, ...resolvedStyle },
     contentEditable: true,
     suppressContentEditableWarning: true,
@@ -167,9 +181,20 @@ export function EditableCmsImage({
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const resolvedStyle = buildFieldStyle(styleValue);
+  const mobileFields = useContext(MobileSettingsContext);
+  const mobileHidden = Boolean(fieldRef && mobileFields?.hiddenFields?.[mobileFieldKey(fieldRef)]);
+  const dimHidden = mobileHidden && Boolean(ctx?.deviceFrame);
 
   if (!ctx?.editMode) {
-    return <img src={src} alt={alt} className={className} style={resolvedStyle} />;
+    return (
+      <img
+        src={src}
+        alt={alt}
+        className={className}
+        style={resolvedStyle}
+        data-hide-mobile={mobileHidden && !ctx ? "true" : undefined}
+      />
+    );
   }
 
   const handleUpload = async (event) => {
@@ -188,7 +213,7 @@ export function EditableCmsImage({
 
   return (
     <span
-      className="cms-editable-image"
+      className={`cms-editable-image${dimHidden ? " cms-mobile-hidden" : ""}`}
       data-cms-interactive="true"
       onClick={(event) => {
         event.stopPropagation();

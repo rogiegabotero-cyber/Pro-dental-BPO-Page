@@ -1,12 +1,15 @@
-import { useEffect, useRef, useState } from "react";
+import { createElement, useEffect, useRef, useState } from "react";
 import {
   FaBars,
   FaChevronDown,
   FaCog,
   FaHome,
+  FaLink,
+  FaPlus,
   FaSignOutAlt,
   FaTachometerAlt,
   FaTimes,
+  FaTrash,
 } from "react-icons/fa";
 import dental_logo from "../assets/Image/1.webp";
 import dental_logo2 from "../assets/Image/2.webp";
@@ -17,6 +20,8 @@ import { useAuth } from "../auth/useAuth";
 import { defaultNavbarContent } from "../data/defaultContent";
 import { useCmsDocumentOverride, useSectionStyleOverride } from "../hooks/useCmsData";
 import { useLayoutEditorContext } from "../context/LayoutEditorContext";
+import { useMobileSettings } from "../hooks/useMobileSettings";
+import { resolveNavIcon } from "../utils/navIcons";
 import { EditableCmsField, EditableCmsImage } from "./EditableCmsField";
 
 export default function Navbar() {
@@ -34,8 +39,68 @@ export default function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { data: navbar } = useCmsDocumentOverride("navbar", defaultNavbarContent);
-  const { style: navbarStyle } = useSectionStyleOverride("navbar");
+  const { style: baseNavbarStyle, raw: navRaw } = useSectionStyleOverride("navbar");
+  // Header appearance settings become CSS variables + data flags; navbar.css
+  // only overrides its defaults when a flag is present.
+  const px = (value) => (value !== "" && value != null ? `${parseInt(value, 10) || 0}px` : null);
+  const navVars = {};
+  const navFlags = {};
+  [
+    ["navPaddingY", "--nav-pad-y", "data-nav-h", px],
+    ["logoIconWidth", "--nav-logo-icon-w", "data-nav-logo-icon", px],
+    ["logoTextWidth", "--nav-logo-text-w", "data-nav-logo-text", px],
+    ["linkFontSize", "--nav-link-size", "data-nav-link-size", px],
+    ["iconSize", "--nav-icon-size", "data-nav-icon-size", px],
+    ["linkColor", "--nav-link-color", "data-nav-link-color", (v) => v || null],
+    ["linkActiveColor", "--nav-active-color", "data-nav-active-color", (v) => v || null],
+    ["iconColor", "--nav-icon-color", "data-nav-icon-color", (v) => v || null],
+    ["menuButtonBg", "--nav-menu-bg", "data-nav-menu-bg", (v) => v || null],
+    ["buttonBg", "--nav-btn-bg", "data-nav-btn", (v) => v || null],
+    ["buttonText", "--nav-btn-text", "data-nav-btn-text", (v) => v || null],
+    ["mobileBarBg", "--nav-bar-bg", "data-nav-bar-bg", (v) => v || null],
+    ["tabFontFamily", "--tab-font", "data-tab-font", (v) => v || null],
+    ["tabFontSize", "--tab-size", "data-tab-size", px],
+    ["tabFontWeight", "--tab-weight", "data-tab-weight", (v) => v || null],
+    ["tabTextColor", "--tab-text", "data-tab-text", (v) => v || null],
+    ["tabActiveColor", "--tab-active", "data-tab-active", (v) => v || null],
+    ["tabIconColor", "--tab-icon-color", "data-tab-icon-color", (v) => v || null],
+    ["tabIconSize", "--tab-icon-size", "data-tab-icon-size", px],
+  ].forEach(([key, cssVar, flag, format]) => {
+    const formatted = format(navRaw?.[key]);
+    if (formatted) {
+      navVars[cssVar] = formatted;
+      navFlags[flag] = "true";
+    }
+  });
+  const navbarStyle = { ...baseNavbarStyle, ...navVars };
+  const tabIcon = (linkId) =>
+    createElement(resolveNavIcon(linkId, navRaw?.tabIcons?.[linkId]), {
+      className: "nav-tab-icon",
+      "aria-hidden": true,
+    });
   const ctx = useLayoutEditorContext();
+  const mobile = useMobileSettings();
+  // Mobile-only settings are applied by CSS media queries on the public site
+  // (and the responsive preview); the desktop editing canvas ignores them so
+  // nothing disappears while you edit.
+  // The editable device frame (phone/tablet) shows the chosen nav style just
+  // like the preview does; links hidden on phones are dimmed there, not
+  // removed, so they can still be edited.
+  const inDeviceFrame = Boolean(ctx?.deviceFrame);
+  const applyMobile = !ctx || inDeviceFrame;
+  const bottomNav = applyMobile && mobile.navStyle === "bottom";
+  const mobileHide = (linkId) => {
+    if (!mobile.hiddenNavLinks[linkId]) return "";
+    if (!ctx) return "nav-hide-mobile";
+    return inDeviceFrame ? "nav-dim-mobile" : "";
+  };
+  // Placeholder; redefined below once the navbar style settings are known.
+
+  useEffect(() => {
+    document.body.classList.toggle("has-bottom-nav", bottomNav);
+    return () => document.body.classList.remove("has-bottom-nav");
+  }, [bottomNav]);
+
   const updateNavbarField = (fieldName, value) => ctx?.updateFieldContent("navbar", fieldName, value);
   const navbarFieldRef = (fieldName) => ({ kind: "content", docId: "navbar", fieldName });
 
@@ -114,6 +179,45 @@ export default function Navbar() {
     doScroll();
   };
 
+  const extraLinks = Array.isArray(navbar.extraLinks) ? navbar.extraLinks : [];
+  const saveExtraLinks = (links) => updateNavbarField("extraLinks", links);
+
+  const promptForUrl = (current) => {
+    const url = window.prompt("Where should this header link go? (e.g. /faq or https://example.com)", current);
+    return url === null ? null : url.trim();
+  };
+
+  const addExtraLink = () => {
+    const url = promptForUrl("/");
+    if (url === null) return;
+    saveExtraLinks([
+      ...extraLinks,
+      { id: Date.now().toString(36), label: "New link", url: url || "/" },
+    ]);
+  };
+
+  const updateExtraLink = (id, patch) =>
+    saveExtraLinks(extraLinks.map((link) => (link.id === id ? { ...link, ...patch } : link)));
+
+  const editExtraLinkUrl = (link) => {
+    const url = promptForUrl(link.url);
+    if (url) updateExtraLink(link.id, { url });
+  };
+
+  const removeExtraLink = (id) => saveExtraLinks(extraLinks.filter((link) => link.id !== id));
+
+  const followExtraLink = (url) => {
+    setOpen(false);
+    if (!url) return;
+    if (url.startsWith("#")) {
+      scrollToSection(url.slice(1));
+    } else if (url.startsWith("/")) {
+      navigate(url);
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  };
+
   const handleLogoClick = () => {
     const goTop = () => {
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -143,6 +247,9 @@ export default function Navbar() {
   };
 
   const handleProfileToggle = () => {
+    // While editing the page, the button only opens/closes the menu; it never
+    // navigates away to the login page.
+    if (!user && ctx?.editMode) return;
     if (!user) {
       handleSignIn();
       return;
@@ -199,7 +306,11 @@ export default function Navbar() {
 
   return (
     <>
-    <nav ref={navRef} className={`nav ${isScrolling ? "scrolling" : ""}`} style={navbarStyle}>
+    <nav
+      ref={navRef}
+      className={`nav ${isScrolling ? "scrolling" : ""}${bottomNav ? " nav--bottom-mobile" : ""}`} style={navbarStyle}
+      {...navFlags}
+    >
       <div
         className="nav-logo logo-tooltip-wrapper"
         onClick={handleLogoClick}
@@ -232,11 +343,12 @@ export default function Navbar() {
 
       <ul className={`nav-links ${open ? "open" : ""}`}>
         <li
-          className={`serv ${
+          className={`serv ${mobileHide("services")} ${
             location.pathname === "/" && activeSection === "services" ? "active" : ""
           }`}
           onClick={() => scrollToSection("services")}
         >
+          {tabIcon("services")}
           <EditableCmsField
             as="span"
             type="text"
@@ -250,11 +362,12 @@ export default function Navbar() {
         </li>
 
         <li
-          className={`abt ${
+          className={`abt ${mobileHide("about")} ${
             location.pathname === "/" && activeSection === "about" ? "active" : ""
           }`}
           onClick={() => scrollToSection("about")}
         >
+          {tabIcon("about")}
           <EditableCmsField
             as="span"
             type="text"
@@ -268,11 +381,12 @@ export default function Navbar() {
         </li>
 
         <li
-          className={`rev ${
+          className={`rev ${mobileHide("benefits")} ${
             location.pathname === "/" && activeSection === "reviews" ? "active" : ""
           }`}
           onClick={() => scrollToSection("reviews")}
         >
+          {tabIcon("benefits")}
           <EditableCmsField
             as="span"
             type="text"
@@ -286,11 +400,12 @@ export default function Navbar() {
         </li>
 
         <li
-          className={`cont ${
+          className={`cont ${mobileHide("articles")} ${
             location.pathname === "/" && activeSection === "articles" ? "active" : ""
           }`}
           onClick={() => scrollToSection("articles")}
         >
+          {tabIcon("articles")}
           <EditableCmsField
             as="span"
             type="text"
@@ -304,11 +419,12 @@ export default function Navbar() {
         </li>
 
         <li
-          className={`cont ${
+          className={`cont ${mobileHide("contact")} ${
             location.pathname === "/" && activeSection === "contact" ? "active" : ""
           }`}
           onClick={() => scrollToSection("contact")}
         >
+          {tabIcon("contact")}
           <EditableCmsField
             as="span"
             type="text"
@@ -322,12 +438,13 @@ export default function Navbar() {
         </li>
 
         <li
-          className={`cont ${location.pathname === "/faq" ? "active" : ""}`}
+          className={`cont ${mobileHide("faq")} ${location.pathname === "/faq" ? "active" : ""}`}
           onClick={() => {
             setOpen(false);
             navigate("/faq");
           }}
         >
+          {tabIcon("faq")}
           <EditableCmsField
             as="span"
             type="text"
@@ -339,6 +456,68 @@ export default function Navbar() {
             fieldRef={navbarFieldRef("faqLabel")}
           />
         </li>
+
+        {extraLinks.map((link) => (
+          <li
+            key={link.id}
+            className={`cont nav-extra-link ${mobileHide(`extra-${link.id}`)} ${
+              link.url.startsWith("/") && location.pathname === link.url ? "active" : ""
+            }`}
+            onClick={() => followExtraLink(link.url)}
+          >
+            {tabIcon(`extra-${link.id}`)}
+            <EditableCmsField
+              as="span"
+              type="text"
+              value={link.label}
+              onCommit={(value) => updateExtraLink(link.id, { label: value })}
+              sectionKey="navbar"
+              ariaLabel="Edit header link label"
+            />
+            {ctx?.editMode && (
+              <span className="nav-extra-link__tools" data-cms-interactive="true">
+                <button
+                  type="button"
+                  title={`Goes to ${link.url} — click to change`}
+                  aria-label="Change link URL"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    editExtraLinkUrl(link);
+                  }}
+                >
+                  <FaLink />
+                </button>
+                <button
+                  type="button"
+                  title="Remove this link"
+                  aria-label="Remove header link"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    removeExtraLink(link.id);
+                  }}
+                >
+                  <FaTrash />
+                </button>
+              </span>
+            )}
+          </li>
+        ))}
+
+        {ctx?.editMode && (
+          <li className="nav-extra-link nav-extra-link--add" data-cms-interactive="true">
+            <button
+              type="button"
+              title="Add a header link"
+              aria-label="Add a header link"
+              onClick={(event) => {
+                event.stopPropagation();
+                addExtraLink();
+              }}
+            >
+              <FaPlus />
+            </button>
+          </li>
+        )}
 
         {/* <li className="cont" onClick={() => setOpen(false)}>
           <a href="#" onClick={(e) => e.preventDefault()}>
@@ -363,7 +542,16 @@ export default function Navbar() {
         </button>
       </ul>
 
-      <button className="menu-toggle" onClick={() => setOpen(!open)}>
+      <button
+        className="menu-toggle"
+        data-cms-interactive="true"
+        aria-expanded={open}
+        aria-label="Toggle menu"
+        onClick={(event) => {
+          event.stopPropagation();
+          setOpen(!open);
+        }}
+      >
         {open ? <FaTimes /> : <FaBars />}
       </button>
 
@@ -390,6 +578,7 @@ export default function Navbar() {
           <button
             className={`client-auth ${user ? "client-auth--signed-in" : ""}`}
             type="button"
+            data-cms-interactive="true"
             onClick={handleProfileToggle}
             title={user ? user.email : "Sign in"}
             aria-label={user ? `Signed in as ${user.displayName || user.email}` : "Sign in"}

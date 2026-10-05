@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
-import { FaArrowsAlt, FaGripVertical, FaMousePointer, FaPen } from "react-icons/fa";
+import { FaArrowsAlt, FaGripVertical, FaMousePointer, FaPen, FaTrash } from "react-icons/fa";
 import { useLayoutEditorContext } from "../context/LayoutEditorContext";
 import { usePixelNudgeDrag } from "../utils/usePixelNudgeDrag";
 
-export default function SectionFrame({ sectionKey, children, reorderable = true }) {
+export default function SectionFrame({ sectionKey, children, reorderable = true, removable = false, hideOnMobile = false, dimOnMobile = false }) {
   const ctx = useLayoutEditorContext();
   const [hovered, setHovered] = useState(false);
   const [armed, setArmed] = useState(false);
@@ -17,7 +17,11 @@ export default function SectionFrame({ sectionKey, children, reorderable = true 
 
   if (!ctx?.editMode) {
     return (
-      <div className="section-frame" data-section={sectionKey}>
+      <div
+        className="section-frame"
+        data-section={sectionKey}
+        data-hide-mobile={hideOnMobile ? "true" : undefined}
+      >
         {children}
       </div>
     );
@@ -30,6 +34,7 @@ export default function SectionFrame({ sectionKey, children, reorderable = true 
     "section-frame",
     "section-frame--editable",
     isSelected && "section-frame--selected",
+    dimOnMobile && "section-frame--mobile-hidden",
     isDragOver && "section-frame--drag-over",
   ]
     .filter(Boolean)
@@ -111,7 +116,21 @@ export default function SectionFrame({ sectionKey, children, reorderable = true 
         >
           <FaArrowsAlt />
         </button>
-        {reorderable && (
+        {removable && (
+          <button
+            type="button"
+            className="section-frame__edit-link"
+            aria-label="Delete this page"
+            title="Delete this page"
+            onClick={(event) => {
+              event.stopPropagation();
+              ctx.removeCustomSection(sectionKey);
+            }}
+          >
+            <FaTrash />
+          </button>
+        )}
+        {reorderable && !removable && (
           <button
             type="button"
             className="section-frame__edit-link"

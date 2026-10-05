@@ -22,6 +22,7 @@ import {
 import { db } from "../firebase";
 import NewsletterSignup from "./NewsletterSignup";
 import { useAuth } from "../auth/useAuth";
+import { useSectionStyleOverride } from "../hooks/useCmsData";
 import { useNewsletterPrompt } from "./NewsletterPromptContext";
 import "../assets/Style/articles.css";
 
@@ -223,6 +224,7 @@ function ArticleWriterProfile({ article }) {
 }
 
 export function ArticlesList() {
+  const { style: pageStyle } = useSectionStyleOverride("articles");
   const [articles, setArticles] = useState([]);
   const location = useLocation();
 
@@ -266,7 +268,7 @@ export function ArticlesList() {
   const gridClasses = `articles-grid ${articles.length === 1 ? "articles-grid--center" : ""}`;
 
   return (
-    <section className="articles-page">
+    <section className="articles-page" style={pageStyle}>
       <header className="articles-hero">
         <span>Articles</span>
         <h1>Dental operations insights from Pro-Dental BPO</h1>

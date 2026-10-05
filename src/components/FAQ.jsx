@@ -1,15 +1,37 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FaSearch } from "react-icons/fa";
 import "../assets/Style/faq.css";
-import { defaultFaqs } from "../data/defaultContent";
-import { useCmsCollection } from "../hooks/useCmsData";
+import { defaultFaqPageContent, defaultFaqs } from "../data/defaultContent";
+import {
+  useCmsCollectionOverride,
+  useCmsDocumentOverride,
+  useSectionStyleOverride,
+} from "../hooks/useCmsData";
+import { useLayoutEditorContext } from "../context/LayoutEditorContext";
+import { EditableCmsField } from "./EditableCmsField";
+import SectionFrame from "./SectionFrame";
 
 export default function FAQ() {
   const [query, setQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [openId, setOpenId] = useState(null);
   const topRef = useRef(null);
-  const { items: faqs } = useCmsCollection("faqs", defaultFaqs);
+  const { items: faqs } = useCmsCollectionOverride("faqs", defaultFaqs);
+  const { data: page } = useCmsDocumentOverride("faqPage", defaultFaqPageContent);
+  const { style: heroStyle } = useSectionStyleOverride("faq-hero");
+  const { style: listStyle } = useSectionStyleOverride("faq-list");
+  const ctx = useLayoutEditorContext();
+  const editing = Boolean(ctx?.editMode);
+  const updatePage = (fieldName, value) => ctx?.updateFieldContent("faqPage", fieldName, value);
+  const pageFieldRef = (fieldName) => ({ kind: "content", docId: "faqPage", fieldName });
+  const itemFieldRef = (itemId, fieldName) => ({
+    kind: "collection",
+    collectionName: "faqs",
+    itemId,
+    fieldName,
+  });
+  const updateItem = (itemId, fieldName, value) =>
+    ctx?.updateCollectionField("faqs", itemId, fieldName, value);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -48,26 +70,63 @@ export default function FAQ() {
   return (
     <section id="faq" className="faqv2" ref={topRef}>
       <div className="faqv2__shell">
-        <header className="faqv2__hero">
+        <SectionFrame sectionKey="faq-hero" reorderable={false}>
+        <header className="faqv2__hero" style={heroStyle}>
           <div className="faqv2__heroCard">
-            <h1 className="faqv2__title">FAQs</h1>
-            <p className="faqv2__subtitle">
-              Find quick answers about partnerships, services, onboarding, and
-              operations fast.
-            </p>
+            <EditableCmsField
+              as="h1"
+              className="faqv2__title"
+              type="text"
+              value={page.title}
+              onCommit={(value) => updatePage("title", value)}
+              sectionKey="faq-hero"
+              ariaLabel="Edit FAQ title"
+              styleValue={page.titleStyle}
+              fieldRef={pageFieldRef("title")}
+            />
+            <EditableCmsField
+              as="p"
+              className="faqv2__subtitle"
+              type="textarea"
+              value={page.subtitle}
+              onCommit={(value) => updatePage("subtitle", value)}
+              sectionKey="faq-hero"
+              ariaLabel="Edit FAQ subtitle"
+              styleValue={page.subtitleStyle}
+              fieldRef={pageFieldRef("subtitle")}
+            />
           </div>
 
           <div className="faqv2__heroGlow" aria-hidden="true" />
         </header>
+        </SectionFrame>
 
-        <div className="faqv2__grid">
+        <SectionFrame sectionKey="faq-list" reorderable={false}>
+        <div className="faqv2__grid" style={listStyle}>
           <aside className="faqv2__side">
             <div className="faqv2__tip">
-              <div className="faqv2__tipTitle">Tip</div>
-              <div className="faqv2__tipBody">
-                Try searching "billing" or "onboarding" to jump straight to the
-                most relevant answers.
-              </div>
+              <EditableCmsField
+                as="div"
+                className="faqv2__tipTitle"
+                type="text"
+                value={page.tipTitle}
+                onCommit={(value) => updatePage("tipTitle", value)}
+                sectionKey="faq-list"
+                ariaLabel="Edit tip title"
+                styleValue={page.tipTitleStyle}
+                fieldRef={pageFieldRef("tipTitle")}
+              />
+              <EditableCmsField
+                as="div"
+                className="faqv2__tipBody"
+                type="textarea"
+                value={page.tipBody}
+                onCommit={(value) => updatePage("tipBody", value)}
+                sectionKey="faq-list"
+                ariaLabel="Edit tip text"
+                styleValue={page.tipBodyStyle}
+                fieldRef={pageFieldRef("tipBody")}
+              />
             </div>
             <div className="faqv2__panel">
               <div className="faqv2__search">
@@ -174,7 +233,8 @@ export default function FAQ() {
                 </div>
               ) : (
                 filtered.map((item, idx) => {
-                  const isOpen = openId === item.id;
+                  // While editing, every answer stays open so it can be edited.
+                  const isOpen = editing || openId === item.id;
                   const panelId = `faq-panel-${item.id}`;
 
                   return (
@@ -192,7 +252,17 @@ export default function FAQ() {
                       >
                         <div className="faqv2__qTextWrap">
                           <div className="faqv2__pill">{item.category}</div>
-                          <div className="faqv2__qText">{item.question}</div>
+                          <EditableCmsField
+                            as="div"
+                            className="faqv2__qText"
+                            type="text"
+                            value={item.question}
+                            onCommit={(value) => updateItem(item.id, "question", value)}
+                            sectionKey="faq-list"
+                            ariaLabel="Edit question"
+                            styleValue={item.questionStyle}
+                            fieldRef={itemFieldRef(item.id, "question")}
+                          />
                         </div>
 
                         <span className="faqv2__icon" aria-hidden="true">
@@ -208,7 +278,17 @@ export default function FAQ() {
                         aria-label="FAQ answer"
                       >
                         <div className="faqv2__a">
-                          <div className="faqv2__aInner">{item.answer}</div>
+                          <EditableCmsField
+                            as="div"
+                            className="faqv2__aInner"
+                            type="textarea"
+                            value={item.answer}
+                            onCommit={(value) => updateItem(item.id, "answer", value)}
+                            sectionKey="faq-list"
+                            ariaLabel="Edit answer"
+                            styleValue={item.answerStyle}
+                            fieldRef={itemFieldRef(item.id, "answer")}
+                          />
                         </div>
                       </div>
                     </article>
@@ -218,6 +298,7 @@ export default function FAQ() {
             </div>
           </main>
         </div>
+        </SectionFrame>
       </div>
     </section>
   );

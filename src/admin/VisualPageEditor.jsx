@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { useNavigate, useParams } from "react-router-dom";
+import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import {
   FaAlignCenter,
   FaAlignLeft,
   FaAlignRight,
+  FaArrowLeft,
   FaArrowsAlt,
   FaBold,
   FaEraser,
   FaEye,
+  FaEyeSlash,
   FaFont,
   FaHighlighter,
   FaItalic,
@@ -24,7 +26,7 @@ import {
   FaUndo,
 } from "react-icons/fa";
 import { db } from "../firebase";
-import { PublicHome } from "../App";
+import { PublicHome, PublicFaq, PublicArticles } from "../App";
 import { useAdminShell } from "./AdminShellContext";
 import {
   useCmsLayout,
@@ -32,8 +34,16 @@ import {
   useCmsDocument,
   normalizeSectionOrder,
   inferBackgroundType,
+  customSectionKeys,
+  CUSTOM_SECTION_PREFIX,
 } from "../hooks/useCmsData";
 import { LayoutEditorContext } from "../context/LayoutEditorContext";
+import { DraftContentContext } from "../context/DraftContentContext";
+import { DRAFTS_COLLECTION } from "../services/pageDrafts";
+import { DeviceControls, ResponsiveStage } from "./ResponsivePreview";
+import MobileSettingsPanel from "./MobileSettingsPanel";
+import NavbarSettings from "./NavbarSettings";
+import { mobileFieldKey, normalizeMobileSettings } from "../hooks/useMobileSettings";
 import DiscardChangesModal from "../components/DiscardChangesModal";
 import { fontOptions } from "../data/fontOptions";
 import { fontSizeOptions } from "../data/fontSizeOptions";
@@ -49,6 +59,8 @@ import {
   defaultServicesSectionContent,
   defaultBenefitsSectionContent,
   defaultFooterSectionContent,
+  defaultFaqPageContent,
+  defaultFaqs,
 } from "../data/defaultContent";
 import "../assets/Style/visualPageEditor.css";
 
@@ -56,7 +68,7 @@ import "../assets/Style/visualPageEditor.css";
 // renders it separately from the section order), but it still needs its own
 // background/font/spacing bucket like every other section.
 const ORDER_SECTION_KEYS = ["hero", "services", "about", "benefits", "contact", "footer"];
-const STYLE_SECTION_KEYS = ["navbar", ...ORDER_SECTION_KEYS];
+const STYLE_SECTION_KEYS = ["navbar", ...ORDER_SECTION_KEYS, "faq-hero", "faq-list", "articles"];
 
 const SECTION_EDIT_ROUTES = {
   hero: "/admin/hero",
@@ -66,6 +78,27 @@ const SECTION_EDIT_ROUTES = {
   contact: "/admin/settings",
   footer: "/admin/settings",
 };
+
+// Pages the canvas can preview. Only Home is editable; the others are
+// read-only views of the live site, each split into named segments the
+// filmstrip can jump to.
+const EDITOR_PAGES = [
+  { id: "home", label: "Home", path: "/", Component: PublicHome },
+  {
+    id: "faq",
+    label: "FAQ",
+    path: "/faq",
+    Component: PublicFaq,
+    segments: ["navbar", "faq-hero", "faq-list", "footer"],
+  },
+  {
+    id: "articles",
+    label: "Articles",
+    path: "/articles",
+    Component: PublicArticles,
+    segments: ["navbar", "articles", "footer"],
+  },
+];
 
 const EXIT_EDIT_MODE = "__EXIT_EDIT_MODE__";
 
@@ -77,6 +110,9 @@ const SECTION_LABELS = {
   benefits: "Benefits",
   contact: "Contact",
   footer: "Footer",
+  "faq-hero": "FAQ intro",
+  "faq-list": "Questions",
+  articles: "Articles",
 };
 
 // A "standard PC" desktop viewport the canvas is rendered at, then scaled down
@@ -94,8 +130,9 @@ const CONTENT_DOC_KEYS = [
   "servicesSection",
   "benefitsSection",
   "footerSection",
+  "faqPage",
 ];
-const EDITABLE_COLLECTIONS = ["services", "benefits"];
+const EDITABLE_COLLECTIONS = ["services", "benefits", "faqs"];
 
 const CONTENT_DOC_FALLBACKS = {
   navbar: defaultNavbarContent,
@@ -105,6 +142,7 @@ const CONTENT_DOC_FALLBACKS = {
   servicesSection: defaultServicesSectionContent,
   benefitsSection: defaultBenefitsSectionContent,
   footerSection: defaultFooterSectionContent,
+  faqPage: defaultFaqPageContent,
 };
 
 const emptyStyle = () => ({
@@ -165,6 +203,10 @@ function emptyPendingExtras() {
 function cloneSnapshot(snapshot) {
   return {
     order: [...snapshot.order],
+    customSections: Object.fromEntries(
+      Object.entries(snapshot.customSections).map(([id, value]) => [id, { ...value }])
+    ),
+    mobile: normalizeMobileSettings(snapshot.mobile),
     styles: Object.fromEntries(
       Object.entries(snapshot.styles).map(([key, value]) => [key, { ...value }])
     ),
@@ -186,9 +228,16 @@ function cloneSnapshot(snapshot) {
 }
 
 function snapshotFromLayout(layout) {
+  const customSections = Object.fromEntries(
+    Object.entries(layout.customSections || {}).map(([id, value]) => [id, { ...value }])
+  );
+  const customKeys = customSectionKeys(customSections);
+
   return {
-    order: normalizeSectionOrder(layout.order, ORDER_SECTION_KEYS),
-    styles: STYLE_SECTION_KEYS.reduce((acc, key) => {
+    order: normalizeSectionOrder(layout.order, [...ORDER_SECTION_KEYS, ...customKeys]),
+    customSections,
+    mobile: normalizeMobileSettings(layout.mobile),
+    styles: [...STYLE_SECTION_KEYS, ...customKeys].reduce((acc, key) => {
       acc[key] = { ...emptyStyle(), ...(layout.styles?.[key] || {}) };
       return acc;
     }, {}),
@@ -258,13 +307,67 @@ function SpacingFields({ value, onChange }) {
   );
 }
 
+const PAGE_LIST_PATH = "/admin/page-content";
+// URL segment that opens the published page itself instead of a draft copy.
+const LIVE_PAGE_ID = "live";
+
+// Loads the draft named in the URL and serves it as the content source for
+// everything inside the editor, so the published page is never read-modified.
 export default function VisualPageEditor() {
+  const { draftId } = useParams();
+  const navigate = useNavigate();
+  const [draft, setDraft] = useState(null);
+  const [status, setStatus] = useState("loading");
+  const isLive = draftId === LIVE_PAGE_ID;
+
+  useEffect(() => {
+    if (isLive) return undefined;
+    return onSnapshot(
+      doc(db, DRAFTS_COLLECTION, draftId),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          setStatus("missing");
+          return;
+        }
+        setDraft({ id: snapshot.id, ...snapshot.data() });
+        setStatus("ready");
+      },
+      () => setStatus("missing")
+    );
+  }, [draftId, isLive]);
+
+  const contentSource = useMemo(
+    () => (draft ? { docs: draft.docs || {}, collections: draft.collections || {} } : null),
+    [draft]
+  );
+
+  useEffect(() => {
+    if (!isLive && status === "missing") navigate(PAGE_LIST_PATH, { replace: true });
+  }, [status, navigate, isLive]);
+
+  if (isLive) {
+    return <DraftEditor draftId={LIVE_PAGE_ID} draftName="Published page (live)" isLive />;
+  }
+
+  if (status !== "ready") {
+    return <div className="admin-loading">Loading draft…</div>;
+  }
+
+  return (
+    <DraftContentContext.Provider value={contentSource}>
+      <DraftEditor key={draft.id} draftId={draft.id} draftName={draft.name} />
+    </DraftContentContext.Provider>
+  );
+}
+
+function DraftEditor({ draftId, draftName, isLive = false }) {
   const navigate = useNavigate();
   const adminShell = useAdminShell();
   const { data: layout } = useCmsLayout();
   const { items: liveServices } = useCmsCollection("services", defaultServices);
   const { items: liveBenefits } = useCmsCollection("benefits", defaultBenefits);
-  const liveCollectionItems = { services: liveServices, benefits: liveBenefits };
+  const { items: liveFaqs } = useCmsCollection("faqs", defaultFaqs);
+  const liveCollectionItems = { services: liveServices, benefits: liveBenefits, faqs: liveFaqs };
   const { data: liveNavbar } = useCmsDocument("navbar", CONTENT_DOC_FALLBACKS.navbar);
   const { data: liveHero } = useCmsDocument("hero", CONTENT_DOC_FALLBACKS.hero);
   const { data: liveAbout } = useCmsDocument("about", CONTENT_DOC_FALLBACKS.about);
@@ -281,6 +384,7 @@ export default function VisualPageEditor() {
     "footerSection",
     CONTENT_DOC_FALLBACKS.footerSection
   );
+  const { data: liveFaqPage } = useCmsDocument("faqPage", CONTENT_DOC_FALLBACKS.faqPage);
   const liveContentDocs = {
     navbar: liveNavbar,
     hero: liveHero,
@@ -289,6 +393,7 @@ export default function VisualPageEditor() {
     servicesSection: liveServicesSection,
     benefitsSection: liveBenefitsSection,
     footerSection: liveFooterSection,
+    faqPage: liveFaqPage,
   };
   const fileInputRef = useRef(null);
   const dragKeyRef = useRef(null);
@@ -357,8 +462,39 @@ export default function VisualPageEditor() {
 
   // Filmstrip order: the header, then every section in its current
   // (possibly reordered) order.
-  const quickJumpKeys = useMemo(() => ["navbar", ...current.order], [current.order]);
+  const [activePageId, setActivePageId] = useState("home");
+  // Responsive testing: null = the normal editable desktop canvas; otherwise a
+  // read-only iframe of the real site at { width, height }.
+  const [viewport, setViewport] = useState(null);
+  const [previewReloadKey, setPreviewReloadKey] = useState(0);
+  const previewFrameRef = useRef(null);
+  const isResponsive = Boolean(viewport);
+  const [sideTab, setSideTab] = useState("inspector");
+  const activePage = EDITOR_PAGES.find((page) => page.id === activePageId) || EDITOR_PAGES[0];
+  const isHomePage = activePage.id === "home";
+  const ActivePageComponent = activePage.Component;
+  // Editing on a device: the page is rendered inside an iframe (so its media
+  // queries follow the device width) with editor state bridged from here.
+  const editingOnDevice = isResponsive && editMode;
+  const previewSrc = editingOnDevice
+    ? `/editor-frame/${draftId}?page=${activePage.id}`
+    : !isLive
+    ? `/draft-preview/${draftId}?page=${activePage.id}`
+    : activePage.path;
+  const quickJumpKeys = useMemo(
+    () => (isHomePage ? ["navbar", ...current.order] : activePage.segments),
+    [isHomePage, activePage, current.order]
+  );
+
+  useEffect(() => {
+    canvasWrapRef.current?.scrollTo({ top: 0 });
+    setActiveJumpKey("navbar");
+  }, [activePageId]);
   const [activeJumpKey, setActiveJumpKey] = useState("navbar");
+  const sectionLabel = (key) =>
+    SECTION_LABELS[key] ||
+    current.customSections[key.slice(CUSTOM_SECTION_PREFIX.length)]?.title ||
+    "New page";
 
   useEffect(() => {
     const wrap = canvasWrapRef.current;
@@ -382,7 +518,23 @@ export default function VisualPageEditor() {
     return () => wrap.removeEventListener("scroll", handleScroll);
   }, [quickJumpKeys]);
 
+  // Keep the responsive preview iframe in sync with unsaved mobile settings.
+  const postMobileSettings = useCallback((mobile) => {
+    previewFrameRef.current?.contentWindow?.postMessage(
+      { type: "mobile-settings", mobile },
+      window.location.origin
+    );
+  }, []);
+
   const scrollToPageSection = useCallback((key) => {
+    const previewDoc = previewFrameRef.current?.contentDocument;
+    if (previewDoc) {
+      previewDoc
+        .querySelector(`[data-section="${key}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
     const wrap = canvasWrapRef.current;
     const frame = canvasFrameRef.current;
     if (!wrap || !frame) return;
@@ -467,6 +619,92 @@ export default function VisualPageEditor() {
         order.splice(fromIndex, 1);
         order.splice(toIndex, 0, draggedKey);
         return { ...snapshot, order };
+      });
+    },
+    [pushSnapshot]
+  );
+
+  const addCustomSection = useCallback(
+    (afterKey) => {
+      const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const key = `${CUSTOM_SECTION_PREFIX}${id}`;
+      pushSnapshot((snapshot) => {
+        const order = [...snapshot.order];
+        const afterIndex = afterKey ? order.indexOf(afterKey) : -1;
+        order.splice(afterIndex + 1, 0, key);
+        return {
+          ...snapshot,
+          order,
+          customSections: {
+            ...snapshot.customSections,
+            [id]: { title: "New page", body: "Click to edit this text." },
+          },
+          styles: { ...snapshot.styles, [key]: emptyStyle() },
+        };
+      });
+      setSelectedSection(key);
+      setSelectedField(null);
+      // Wait for the new panel to render, then bring it into view.
+      setTimeout(() => scrollToPageSection(key), 80);
+    },
+    [pushSnapshot, scrollToPageSection]
+  );
+
+  const removeCustomSection = useCallback(
+    (key) => {
+      const id = key.slice(CUSTOM_SECTION_PREFIX.length);
+      pushSnapshot((snapshot) => {
+        const customSections = { ...snapshot.customSections };
+        const styles = { ...snapshot.styles };
+        delete customSections[id];
+        delete styles[key];
+        return {
+          ...snapshot,
+          order: snapshot.order.filter((entry) => entry !== key),
+          customSections,
+          styles,
+        };
+      });
+      setSelectedSection((prev) => (prev === key ? null : prev));
+      setSelectedField(null);
+    },
+    [pushSnapshot]
+  );
+
+  const updateMobileSettings = useCallback(
+    (mobile) => {
+      pushSnapshot((snapshot) => ({ ...snapshot, mobile }));
+    },
+    [pushSnapshot]
+  );
+
+  const setFieldHiddenOnMobile = useCallback(
+    (fieldRef, hidden) => {
+      const key = mobileFieldKey(fieldRef);
+      pushSnapshot((snapshot) => {
+        const hiddenFields = { ...snapshot.mobile.hiddenFields };
+        if (hidden) {
+          hiddenFields[key] = true;
+        } else {
+          delete hiddenFields[key];
+        }
+        return { ...snapshot, mobile: { ...snapshot.mobile, hiddenFields } };
+      });
+    },
+    [pushSnapshot]
+  );
+
+  const updateCustomSection = useCallback(
+    (id, patch) => {
+      pushSnapshot((snapshot) => {
+        if (!snapshot.customSections[id]) return snapshot;
+        return {
+          ...snapshot,
+          customSections: {
+            ...snapshot.customSections,
+            [id]: { ...snapshot.customSections[id], ...patch },
+          },
+        };
       });
     },
     [pushSnapshot]
@@ -663,6 +901,14 @@ export default function VisualPageEditor() {
     setSelectedField(null);
   }, [editMode, hasUnsavedChanges, adminShell]);
 
+  const goToPageList = useCallback(() => {
+    if (hasUnsavedChanges) {
+      setPendingNav(PAGE_LIST_PATH);
+    } else {
+      navigate(PAGE_LIST_PATH);
+    }
+  }, [hasUnsavedChanges, navigate]);
+
   const cancelDiscard = useCallback(() => setPendingNav(null), []);
 
   const confirmDiscard = useCallback(() => {
@@ -679,76 +925,142 @@ export default function VisualPageEditor() {
     setPendingNav(null);
   }, [layout, pendingNav, navigate]);
 
+  // Writes the pending edits straight to the published documents.
+  const saveToLivePage = useCallback(async () => {
+    const writes = [
+      setDoc(
+        doc(db, "siteContent", "layout"),
+        {
+          order: current.order,
+          styles: current.styles,
+          customSections: current.customSections,
+          mobile: current.mobile,
+          updatedAt: serverTimestamp(),
+        },
+        // mergeFields replaces these fields wholesale, so a deleted page
+        // (or its style bucket) doesn't linger in the stored document.
+        { mergeFields: ["order", "styles", "customSections", "mobile", "updatedAt"] }
+      ),
+    ];
+
+    CONTENT_DOC_KEYS.forEach((docId) => {
+      const patch = current.content[docId];
+      if (patch && Object.keys(patch).length > 0) {
+        writes.push(
+          setDoc(
+            doc(db, "siteContent", docId),
+            { ...patch, updatedAt: serverTimestamp() },
+            { merge: true }
+          )
+        );
+      }
+    });
+
+    EDITABLE_COLLECTIONS.forEach((collectionName) => {
+      const entry = current.collections[collectionName];
+      const liveItems = liveCollectionItems[collectionName];
+      const liveIds = liveItems.map((item) => item.id);
+      const finalOrder = entry.order ? normalizeSectionOrder(entry.order, liveIds) : liveIds;
+      const liveOrderById = Object.fromEntries(
+        liveItems.map((item) => [item.id, Number(item.order || 0)])
+      );
+
+      finalOrder.forEach((itemId, index) => {
+        const fieldPatch = entry.items[itemId];
+        const nextOrder = index + 1;
+        const orderChanged = liveOrderById[itemId] !== nextOrder;
+        const hasFieldPatch = Boolean(fieldPatch && Object.keys(fieldPatch).length > 0);
+
+        if (!hasFieldPatch && !orderChanged) return;
+
+        writes.push(
+          setDoc(
+            doc(db, collectionName, itemId),
+            {
+              ...(hasFieldPatch ? fieldPatch : {}),
+              ...(orderChanged ? { order: nextOrder } : {}),
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true }
+          )
+        );
+      });
+    });
+
+    await Promise.all(writes);
+  }, [current, liveCollectionItems]);
+
   const handleSave = useCallback(async () => {
     setSaving(true);
     setMessage("");
 
     try {
-      const writes = [
-        setDoc(
-          doc(db, "siteContent", "layout"),
-          { order: current.order, styles: current.styles, updatedAt: serverTimestamp() },
-          { merge: true }
-        ),
-      ];
+      if (isLive) {
+        await saveToLivePage();
+        setMessage("Changes published.");
+        setPreviewReloadKey((key) => key + 1);
+        return;
+      }
 
+      // Everything is written to the draft; the published documents are only
+      // touched when the draft is explicitly published from the page list.
+      const docs = {
+        layout: {
+          ...layout,
+          order: current.order,
+          styles: current.styles,
+          customSections: current.customSections,
+          mobile: current.mobile,
+        },
+      };
       CONTENT_DOC_KEYS.forEach((docId) => {
-        const patch = current.content[docId];
-        if (patch && Object.keys(patch).length > 0) {
-          writes.push(
-            setDoc(
-              doc(db, "siteContent", docId),
-              { ...patch, updatedAt: serverTimestamp() },
-              { merge: true }
-            )
-          );
-        }
+        docs[docId] = { ...liveContentDocs[docId], ...(current.content[docId] || {}) };
       });
 
+      const collections = {};
       EDITABLE_COLLECTIONS.forEach((collectionName) => {
         const entry = current.collections[collectionName];
         const liveItems = liveCollectionItems[collectionName];
         const liveIds = liveItems.map((item) => item.id);
         const finalOrder = entry.order ? normalizeSectionOrder(entry.order, liveIds) : liveIds;
-        const liveOrderById = Object.fromEntries(
-          liveItems.map((item) => [item.id, Number(item.order || 0)])
-        );
+        const byId = Object.fromEntries(liveItems.map((item) => [item.id, item]));
 
-        finalOrder.forEach((itemId, index) => {
-          const fieldPatch = entry.items[itemId];
-          const nextOrder = index + 1;
-          const orderChanged = liveOrderById[itemId] !== nextOrder;
-          const hasFieldPatch = Boolean(fieldPatch && Object.keys(fieldPatch).length > 0);
-
-          if (!hasFieldPatch && !orderChanged) return;
-
-          writes.push(
-            setDoc(
-              doc(db, collectionName, itemId),
-              {
-                ...(hasFieldPatch ? fieldPatch : {}),
-                ...(orderChanged ? { order: nextOrder } : {}),
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true }
-            )
-          );
-        });
+        collections[collectionName] = finalOrder.map((itemId, index) => ({
+          ...byId[itemId],
+          ...(entry.items[itemId] || {}),
+          id: itemId,
+          order: index + 1,
+        }));
       });
 
-      await Promise.all(writes);
+      // mergeFields replaces these fields wholesale, so removed pages and
+      // styles don't linger in the stored draft.
+      await setDoc(
+        doc(db, DRAFTS_COLLECTION, draftId),
+        { docs, collections, updatedAt: serverTimestamp() },
+        { mergeFields: ["docs", "collections", "updatedAt"] }
+      );
 
       setEditorState({
-        history: [{ order: current.order, styles: current.styles, ...emptyPendingExtras() }],
+        history: [
+          {
+            order: current.order,
+            styles: current.styles,
+            customSections: current.customSections,
+            mobile: current.mobile,
+            ...emptyPendingExtras(),
+          },
+        ],
         index: 0,
       });
-      setMessage("Changes saved.");
-    } catch (error) {
+      setMessage("Draft saved.");
+      setPreviewReloadKey((key) => key + 1);
+    } catch {
       setMessage("Could not save changes. Please try again.");
     } finally {
       setSaving(false);
     }
-  }, [current, liveCollectionItems]);
+  }, [current, layout, liveContentDocs, liveCollectionItems, draftId, isLive, saveToLivePage]);
 
   const keyboardNudgeStateRef = useRef(null);
 
@@ -1012,11 +1324,130 @@ export default function VisualPageEditor() {
     updateSelectedFieldStyle({ ...emptyFieldStyle });
   };
 
+  // --- Bridge to the editable iframe used when editing on a phone/tablet ---
+  const liveFieldStylesJson = JSON.stringify(
+    (() => {
+      const pickStyles = (source) =>
+        Object.fromEntries(
+          Object.entries(source || {}).filter(
+            ([key, value]) => key.endsWith("Style") && value && typeof value === "object"
+          )
+        );
+      return {
+        content: Object.fromEntries(
+          Object.entries(liveContentDocs).map(([docId, data]) => [docId, pickStyles(data)])
+        ),
+        collections: Object.fromEntries(
+          Object.entries(liveCollectionItems).map(([name, items]) => [
+            name,
+            Object.fromEntries(items.map((item) => [item.id, pickStyles(item)])),
+          ])
+        ),
+      };
+    })()
+  );
+
+  const sendEditorState = useCallback(() => {
+    const frameWindow = previewFrameRef.current?.contentWindow;
+    if (!frameWindow) return;
+    try {
+      frameWindow.postMessage(
+        {
+          type: "editor-state",
+          state: {
+            editMode: true,
+            deviceFrame: true,
+            mobile: current.mobile,
+            pendingOrder: current.order,
+            pendingCustomSections: current.customSections,
+            pendingStyles: current.styles,
+            pendingContent: current.content,
+            pendingCollections: current.collections,
+            selectedSection,
+            selectedField,
+            dragKey,
+            cardDragKey,
+            elementDragKey,
+            liveFieldStyles: JSON.parse(liveFieldStylesJson),
+          },
+        },
+        window.location.origin
+      );
+    } catch {
+      // A value that cannot be cloned should never break editing.
+    }
+  }, [
+    current,
+    selectedSection,
+    selectedField,
+    dragKey,
+    cardDragKey,
+    elementDragKey,
+    liveFieldStylesJson,
+  ]);
+
+  const sendEditorStateRef = useRef(sendEditorState);
+  sendEditorStateRef.current = sendEditorState;
+  const bridgeActionsRef = useRef({});
+
+  useEffect(() => {
+    if (!editingOnDevice) return undefined;
+
+    const onMessage = (event) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.source !== previewFrameRef.current?.contentWindow) return;
+      const data = event.data;
+      if (data?.type === "editor-frame-ready") {
+        sendEditorStateRef.current();
+      } else if (data?.type === "editor-call") {
+        const action = bridgeActionsRef.current[data.fn];
+        if (typeof action === "function") action(...(data.args || []));
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [editingOnDevice]);
+
+  useEffect(() => {
+    if (editingOnDevice) sendEditorState();
+  }, [editingOnDevice, sendEditorState]);
+
+  useEffect(() => {
+    if (isResponsive) postMobileSettings(current.mobile);
+  }, [isResponsive, current.mobile, postMobileSettings]);
+
+  const mobileNavLinks = useMemo(() => {
+    const navbarDoc = { ...liveNavbar, ...(current.content.navbar || {}) };
+    const extras = Array.isArray(navbarDoc.extraLinks) ? navbarDoc.extraLinks : [];
+    return [
+      { id: "services", label: navbarDoc.servicesLabel || "Services" },
+      { id: "about", label: navbarDoc.aboutLabel || "About" },
+      { id: "benefits", label: navbarDoc.benefitsLabel || "Benefits" },
+      { id: "articles", label: navbarDoc.articlesLabel || "Articles" },
+      { id: "contact", label: navbarDoc.contactLabel || "Contact" },
+      { id: "faq", label: navbarDoc.faqLabel || "FAQ" },
+      ...extras.map((link) => ({ id: `extra-${link.id}`, label: link.label })),
+    ];
+  }, [liveNavbar, current.content.navbar]);
+
+  const mobileSections = current.order.map((key) => ({
+    key,
+    label:
+      SECTION_LABELS[key] ||
+      current.customSections[key.slice(CUSTOM_SECTION_PREFIX.length)]?.title ||
+      "New page",
+  }));
+
   const contextValue = useMemo(
     () => ({
       editMode,
       canvasScale,
       pendingOrder: current.order,
+      pendingCustomSections: current.customSections,
+      addCustomSection,
+      removeCustomSection,
+      updateCustomSection,
       pendingStyles: current.styles,
       pendingContent: current.content,
       pendingCollections: current.collections,
@@ -1050,6 +1481,9 @@ export default function VisualPageEditor() {
       editMode,
       canvasScale,
       current,
+      addCustomSection,
+      removeCustomSection,
+      updateCustomSection,
       selectedSection,
       selectSection,
       selectedField,
@@ -1078,10 +1512,15 @@ export default function VisualPageEditor() {
     ]
   );
 
+  bridgeActionsRef.current = contextValue;
+
+  // Mobile settings are only reachable while editing on a device.
+  const showMobileTab = editingOnDevice && sideTab === "mobile";
+
   const inspectorTitle = selectedField
     ? selectedField.fieldName
     : selectedSection
-    ? selectedSection
+    ? SECTION_LABELS[selectedSection] || selectedSection
     : "Nothing selected";
 
   return (
@@ -1091,11 +1530,29 @@ export default function VisualPageEditor() {
           <div className="layout-editor-toolbar__group">
             <button
               type="button"
+              className="layout-editor-toolbar__button"
+              onClick={goToPageList}
+              title="Back to the page list"
+            >
+              <FaArrowLeft /> Pages
+            </button>
+            <span
+              className="layout-editor-toolbar__hint"
+              title={
+                isLive
+                  ? "Saving publishes changes to the live site immediately"
+                  : "You are editing a draft copy"
+              }
+            >
+              {isLive ? "Editing the live page" : `Draft: ${draftName}`}
+            </span>
+            <button
+              type="button"
               className="layout-editor-toolbar__button layout-editor-toolbar__button--primary"
               onClick={handleSave}
               disabled={!hasUnsavedChanges || saving}
             >
-              <FaSave /> {saving ? "Saving…" : "Save"}
+              <FaSave /> {saving ? "Saving…" : isLive ? "Save & publish" : "Save"}
             </button>
             <button
               type="button"
@@ -1120,6 +1577,12 @@ export default function VisualPageEditor() {
             {message && <span className="layout-editor-toolbar__hint">{message}</span>}
           </div>
 
+          <DeviceControls
+            viewport={viewport}
+            onChange={setViewport}
+            onReload={() => setPreviewReloadKey((key) => key + 1)}
+          />
+
           <button
             type="button"
             className={`layout-editor-toolbar__button layout-editor-toolbar__button--mode${
@@ -1127,14 +1590,34 @@ export default function VisualPageEditor() {
             }`}
             onClick={toggleEditMode}
             aria-pressed={editMode}
-            title={editMode ? "Exit edit mode" : "Edit this page"}
+            title={
+              editMode
+                ? "Exit edit mode"
+                : "Edit this page"
+            }
           >
             {editMode ? <FaEye /> : <FaPen />} {editMode ? "Preview" : "Edit this page"}
           </button>
         </header>
 
         <div className="layout-editor-body">
-          <div className="layout-editor-canvas" ref={canvasWrapRef}>
+          {isResponsive && (
+            <ResponsiveStage
+              src={previewSrc}
+              viewport={viewport}
+              onResize={(width) =>
+                setViewport((prev) => ({ ...prev, deviceId: "custom", width }))
+              }
+              reloadKey={previewReloadKey}
+              iframeRef={previewFrameRef}
+              onLoad={() => postMobileSettings(current.mobile)}
+            />
+          )}
+          <div
+            className="layout-editor-canvas"
+            ref={canvasWrapRef}
+            style={isResponsive ? { display: "none" } : undefined}
+          >
             <div
               className="layout-editor-frame-shell"
               style={{
@@ -1147,7 +1630,7 @@ export default function VisualPageEditor() {
                 className="layout-editor-frame"
                 style={{ width: CANVAS_DEVICE_WIDTH, transform: `scale(${canvasScale})` }}
               >
-                <PublicHome />
+                <ActivePageComponent />
               </div>
             </div>
           </div>
@@ -1156,11 +1639,42 @@ export default function VisualPageEditor() {
             <div className="layout-editor-sidepanel__header">
               <div>
                 <span className="layout-editor-sidepanel__eyebrow">
-                  {selectedField ? "Text" : selectedSection ? "Section" : "Inspector"}
+                  {showMobileTab
+                    ? "Phones (768px and narrower)"
+                    : selectedField
+                    ? "Text"
+                    : selectedSection
+                    ? "Section"
+                    : "Inspector"}
                 </span>
-                <h3 className="layout-editor-sidepanel__title">{inspectorTitle}</h3>
+                <h3 className="layout-editor-sidepanel__title">
+                  {showMobileTab ? "Mobile settings" : inspectorTitle}
+                </h3>
               </div>
-              {(selectedSection || selectedField) && (
+              {editingOnDevice && (
+                <div className="layout-editor-sidetabs" role="tablist" aria-label="Side panel">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={!showMobileTab}
+                    className={`layout-editor-sidetabs__button${showMobileTab ? "" : " is-active"}`}
+                    onClick={() => setSideTab("inspector")}
+                    title="Style the selected item"
+                  >
+                    Inspector
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={showMobileTab}
+                    className={`layout-editor-sidetabs__button${showMobileTab ? " is-active" : ""}`}
+                    onClick={() => setSideTab("mobile")}
+                  >
+                    Mobile
+                  </button>
+                </div>
+              )}
+              {!showMobileTab && (selectedSection || selectedField) && (
                 <button
                   type="button"
                   className="layout-editor-sidepanel__close"
@@ -1176,11 +1690,39 @@ export default function VisualPageEditor() {
               )}
             </div>
 
-            <div className="layout-editor-sidepanel__body">
+            {showMobileTab && (
+              <MobileSettingsPanel
+                mobile={current.mobile}
+                sections={mobileSections}
+                navLinks={mobileNavLinks}
+                onChange={updateMobileSettings}
+              />
+            )}
+
+            <div
+              className="layout-editor-sidepanel__body"
+              style={showMobileTab ? { display: "none" } : undefined}
+            >
               {editMode && !selectedSection && !selectedField && (
                 <p className="layout-editor-sidepanel__hint">
                   Click a section, image, or piece of text on the page to edit it.
                 </p>
+              )}
+
+              {selectedField && editingOnDevice && (
+                <div className="layout-editor-panel-section">
+                  <span className="layout-editor-panel-section__label">
+                    <FaEyeSlash /> Phone visibility
+                  </span>
+                  <label className="layout-editor-check">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(current.mobile.hiddenFields[mobileFieldKey(selectedField)])}
+                      onChange={(event) => setFieldHiddenOnMobile(selectedField, event.target.checked)}
+                    />
+                    <span>Hide this {selectedField.isImage ? "image" : "element"} on phones</span>
+                  </label>
+                </div>
               )}
 
               {selectedField && (
@@ -1588,16 +2130,46 @@ export default function VisualPageEditor() {
                       onChange={(patch) => updateStyle(selectedSection, patch)}
                     />
                   </div>
+
+                  {selectedSection === "navbar" && (
+                    <NavbarSettings
+                      value={selectedRaw}
+                      navLinks={mobileNavLinks}
+                      onChange={(patch) => updateStyle("navbar", patch)}
+                    />
+                  )}
                 </div>
               )}
             </div>
           </aside>
         </div>
 
+        <div className="layout-editor-pagebar" role="tablist" aria-label="Preview a page">
+          <span className="layout-editor-pagebar__label">Pages</span>
+          {EDITOR_PAGES.map((page) => (
+            <button
+              key={page.id}
+              type="button"
+              role="tab"
+              aria-selected={page.id === activePage.id}
+              className={`layout-editor-pagebar__button${
+                page.id === activePage.id ? " is-active" : ""
+              }`}
+              onClick={() => {
+                setSelectedSection(null);
+                setSelectedField(null);
+                setActivePageId(page.id);
+              }}
+              title={`Show ${page.path}`}
+            >
+              {page.label} <small>{page.path}</small>
+            </button>
+          ))}
+        </div>
+
         <nav
-          className={`layout-editor-filmstrip${editMode ? "" : " is-disabled"}`}
+          className="layout-editor-filmstrip"
           aria-label="Jump to a section"
-          aria-disabled={!editMode}
         >
           {quickJumpKeys.map((key, index) => (
             <button
@@ -1607,12 +2179,12 @@ export default function VisualPageEditor() {
                 activeJumpKey === key ? " is-active" : ""
               }`}
               onClick={() => scrollToPageSection(key)}
-              title={`Jump to ${SECTION_LABELS[key] || key}`}
+              title={`Jump to ${sectionLabel(key)}`}
             >
               <span className="layout-editor-filmstrip__thumb" ref={setThumbRef(key)} />
               <span className="layout-editor-filmstrip__caption">
                 <span className="layout-editor-filmstrip__index">{index + 1}</span>
-                {SECTION_LABELS[key] || key}
+                {sectionLabel(key)}
               </span>
             </button>
           ))}

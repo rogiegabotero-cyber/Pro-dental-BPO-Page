@@ -22,6 +22,8 @@ export const defaultNavbarContent = {
   articlesLabel: "Articles",
   contactLabel: "Contact",
   faqLabel: "FAQ",
+  // Extra header links added in the page editor: [{ id, label, url }].
+  extraLinks: [],
   scheduleLabel: "Schedule Consultation",
   bookLabel: "Book Appointment",
 };
@@ -181,6 +183,15 @@ export const defaultBenefits = [
       "Accurate and faster filing ensures payments are received sooner - that is liquid capital to cover overhead, salaries, and equipment.",
   },
 ];
+
+export const defaultFaqPageContent = {
+  title: "FAQs",
+  subtitle:
+    "Find quick answers about partnerships, services, onboarding, and operations fast.",
+  tipTitle: "Tip",
+  tipBody:
+    'Try searching "billing" or "onboarding" to jump straight to the most relevant answers.',
+};
 
 export const defaultFaqs = [
   {

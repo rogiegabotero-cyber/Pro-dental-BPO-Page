@@ -45,26 +45,13 @@
   height: auto;
 }
 
-/* The page editor wraps each logo in a `.cms-editable-image` span sized at
-   100%/100% (see visualPageEditor.css) so it can fill a fixed-size box like
-   Hero's image frame. The nav logos have no such box — they're sized by their
-   own width/height rules above — so pin the wrapper and image back down to
-   that intrinsic size while editing, or the image would fall back to its raw
-   upload resolution. */
+/* The page editor wraps each logo in a `.cms-editable-image` span (100%/100%
+   by default, see visualPageEditor.css). The nav logos have no fixed-size box
+   — their own class rules above (and the media queries) size the <img> — so
+   let the wrapper shrink to fit and leave the image sizing to those rules. */
 .nav-logo .cms-editable-image {
   display: inline-flex;
   width: auto;
-  height: auto;
-}
-
-.nav-logo .cms-editable-image:first-of-type img {
-  width: 80px;
-  height: auto;
-  border-radius: 10px;
-}
-
-.nav-logo .cms-editable-image:last-of-type img {
-  width: 240px;
   height: auto;
 }
 
@@ -608,5 +595,215 @@
 
   .profile-dropdown {
     width: min(280px, calc(100vw - 24px));
+  }
+}
+
+/* Extra header links added in the page editor */
+.nav-extra-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-extra-link__tools {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.nav-extra-link__tools button,
+.nav-extra-link--add button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(11, 143, 158, 0.35);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #0b8f9e;
+  cursor: pointer;
+}
+
+.nav-extra-link__tools svg,
+.nav-extra-link--add svg {
+  width: 10px;
+  height: 10px;
+}
+
+/* Tab icons only exist for the bottom mobile bar. */
+.nav-tab-icon {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .nav-links li.nav-hide-mobile {
+    display: none !important;
+  }
+
+  /* Bottom bar mobile menu: the links become a tab bar pinned to the bottom
+     of the screen instead of the burger dropdown. */
+  .nav--bottom-mobile .menu-toggle {
+    display: none;
+  }
+
+  .nav--bottom-mobile .nav-links {
+    position: fixed;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 1001;
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: space-around;
+    gap: 0;
+    max-height: none;
+    overflow: visible;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+    background: #ffffff;
+    border-top: 1px solid #d7eef2;
+    border-bottom: 0;
+    box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.1);
+  }
+
+  .nav--bottom-mobile .nav-links li {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 6px 2px;
+    font-size: 10.5px;
+    line-height: 1.15;
+    color: #475569;
+    text-align: center;
+  }
+
+  .nav--bottom-mobile .nav-links li::after {
+    display: none;
+  }
+
+  .nav--bottom-mobile .nav-links li.active {
+    color: #0b8f9e;
+  }
+
+  .nav--bottom-mobile .nav-tab-icon {
+    display: block;
+    width: 18px;
+    height: 18px;
+  }
+
+  .nav--bottom-mobile .nav-links .mobile-btn {
+    display: none;
+  }
+
+  body.has-bottom-nav {
+    padding-bottom: 62px;
+  }
+}
+
+.nav-links li.nav-dim-mobile {
+  opacity: 0.4;
+}
+
+/* Header appearance settings from the page editor (see Navbar.jsx). Each rule
+   only applies when its data flag is set, so untouched headers are unchanged. */
+.nav[data-nav-h] {
+  padding-top: var(--nav-pad-y);
+  padding-bottom: var(--nav-pad-y);
+}
+
+.nav[data-nav-logo-icon] .logo-icon {
+  width: var(--nav-logo-icon-w);
+}
+
+.nav[data-nav-logo-text] .logo-icon2 {
+  width: var(--nav-logo-text-w);
+}
+
+.nav[data-nav-link-size] .nav-links li {
+  font-size: var(--nav-link-size);
+}
+
+.nav[data-nav-link-color] .nav-links li,
+.nav.scrolling[data-nav-link-color] .nav-links li,
+.nav.scrolling[data-nav-link-color] .nav-links {
+  color: var(--nav-link-color);
+}
+
+.nav[data-nav-active-color] .nav-links li.active,
+.nav.scrolling[data-nav-active-color] .nav-links li.active {
+  color: var(--nav-active-color);
+}
+
+.nav[data-nav-icon-color] .menu-toggle,
+.nav.scrolling[data-nav-icon-color] .menu-toggle,
+.nav[data-nav-icon-color] .nav-tab-icon,
+.nav[data-nav-icon-color] .client-auth__chevron {
+  color: var(--nav-icon-color);
+}
+
+.nav[data-nav-icon-size] .menu-toggle {
+  font-size: var(--nav-icon-size);
+}
+
+.nav[data-nav-icon-size] .nav-tab-icon,
+.nav[data-nav-icon-size] .client-auth__chevron {
+  width: var(--nav-icon-size);
+  height: var(--nav-icon-size);
+}
+
+.nav[data-nav-menu-bg] .menu-toggle {
+  background: var(--nav-menu-bg);
+}
+
+.nav[data-nav-btn] .slice {
+  --c1: var(--nav-btn-bg);
+}
+
+.nav[data-nav-btn-text] .slice {
+  --c2: var(--nav-btn-text);
+}
+
+@media (max-width: 768px) {
+  .nav--bottom-mobile[data-nav-bar-bg] .nav-links {
+    background: var(--nav-bar-bg);
+  }
+}
+
+/* Bottom tab bar customization (phones only, when the bottom bar is active). */
+@media (max-width: 768px) {
+  .nav--bottom-mobile[data-tab-font] .nav-links li {
+    font-family: var(--tab-font);
+  }
+
+  .nav--bottom-mobile[data-tab-size] .nav-links li {
+    font-size: var(--tab-size);
+  }
+
+  .nav--bottom-mobile[data-tab-weight] .nav-links li {
+    font-weight: var(--tab-weight);
+  }
+
+  .nav--bottom-mobile[data-tab-text] .nav-links li {
+    color: var(--tab-text);
+  }
+
+  .nav--bottom-mobile[data-tab-icon-color] .nav-tab-icon {
+    color: var(--tab-icon-color);
+  }
+
+  .nav--bottom-mobile[data-tab-icon-size] .nav-tab-icon {
+    width: var(--tab-icon-size);
+    height: var(--tab-icon-size);
+  }
+
+  .nav--bottom-mobile[data-tab-active] .nav-links li.active,
+  .nav--bottom-mobile[data-tab-active] .nav-links li.active .nav-tab-icon {
+    color: var(--tab-active);
   }
 }

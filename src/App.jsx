@@ -1,5 +1,5 @@
 import "./App.css";
-import { lazy, Suspense, useEffect } from "react";
+import { Fragment, lazy, Suspense, useEffect } from "react";
 import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from "react-router-dom";
 
 import { AuthProvider } from "./auth/AuthProvider";
@@ -23,9 +23,18 @@ import { NewsletterPromptProvider } from "./components/NewsletterPromptContext";
 import Reviews from "./components/Reviews";
 import Services from "./components/Services";
 import SectionFrame from "./components/SectionFrame";
+import CustomSection from "./components/CustomSection";
+import InsertPageBar from "./components/InsertPageBar";
+import MobileSettingsProvider from "./components/MobileSettingsProvider";
 import { useVisitTracking } from "./hooks/useVisitTracking";
-import { useCmsLayout, normalizeSectionOrder } from "./hooks/useCmsData";
+import {
+  useCmsLayout,
+  normalizeSectionOrder,
+  customSectionKeys,
+  CUSTOM_SECTION_PREFIX,
+} from "./hooks/useCmsData";
 import { useLayoutEditorContext } from "./context/LayoutEditorContext";
+import { useMobileSettings } from "./hooks/useMobileSettings";
 
 const lazyAdmin = (exportName) =>
   lazy(() =>
@@ -42,6 +51,13 @@ const CollectionEditor = lazyAdmin("CollectionEditor");
 const MediaPage = lazyAdmin("MediaPage");
 const SiteContentEditor = lazyAdmin("SiteContentEditor");
 const VisualPageEditor = lazy(() => import("./admin/VisualPageEditor"));
+const PageContentList = lazy(() => import("./admin/PageContentList"));
+const DraftPreview = lazy(() => import("./admin/DraftPreview"));
+const EditorFrame = lazy(() => import("./admin/EditorFrame"));
+
+// Thumbnails on the admin Pages screen load the site inside iframes; keep the
+// admin-only floating widgets and popups out of those.
+const isEmbedded = typeof window !== "undefined" && window.self !== window.top;
 
 const SECTION_COMPONENTS = {
   hero: Home,
@@ -65,35 +81,83 @@ function ScrollToTop() {
 export function PublicHome() {
   const { data: layout } = useCmsLayout();
   const editorContext = useLayoutEditorContext();
-  const liveOrder = editorContext?.editMode ? editorContext.pendingOrder : layout.order;
-  const order = normalizeSectionOrder(liveOrder, Object.keys(SECTION_COMPONENTS));
+  const mobile = useMobileSettings();
+  const editing = Boolean(editorContext?.editMode);
+  // Hidden-on-phone sections are hidden by CSS media query; the editor
+  // desktop canvas never applies it so every section stays editable.
+  const applyMobile = !editorContext;
+  const liveOrder = editing ? editorContext.pendingOrder : layout.order;
+  const customSections = (editing ? editorContext.pendingCustomSections : layout.customSections) || {};
+  const order = normalizeSectionOrder(liveOrder, [
+    ...Object.keys(SECTION_COMPONENTS),
+    ...customSectionKeys(customSections),
+  ]);
 
+  return (
+    <MobileSettingsProvider>
+      <SectionFrame sectionKey="navbar" reorderable={false}>
+        <Navbar />
+      </SectionFrame>
+      {editing && <InsertPageBar afterKey={null} />}
+      {order.map((sectionKey, index) => {
+        const isCustom = sectionKey.startsWith(CUSTOM_SECTION_PREFIX);
+        const Section = SECTION_COMPONENTS[sectionKey];
+        const customContent = isCustom
+          ? customSections[sectionKey.slice(CUSTOM_SECTION_PREFIX.length)]
+          : null;
+        if (!Section && !customContent) return null;
+
+        return (
+          <Fragment key={sectionKey}>
+            <SectionFrame
+              sectionKey={sectionKey}
+              removable={isCustom}
+              hideOnMobile={applyMobile && Boolean(mobile.hiddenSections[sectionKey])}
+              dimOnMobile={
+                Boolean(editorContext?.deviceFrame) && Boolean(mobile.hiddenSections[sectionKey])
+              }
+            >
+              {customContent ? (
+                <CustomSection sectionKey={sectionKey} content={customContent} />
+              ) : (
+                <Section />
+              )}
+              {sectionKey === "benefits" && <ArticlePreviewSection />}
+            </SectionFrame>
+            {editing && index < order.length - 1 && <InsertPageBar afterKey={sectionKey} />}
+          </Fragment>
+        );
+      })}
+    </MobileSettingsProvider>
+  );
+}
+
+export function PublicFaq() {
   return (
     <>
       <SectionFrame sectionKey="navbar" reorderable={false}>
         <Navbar />
       </SectionFrame>
-      {order.map((sectionKey) => {
-        const Section = SECTION_COMPONENTS[sectionKey];
-        if (!Section) return null;
-
-        return (
-          <SectionFrame key={sectionKey} sectionKey={sectionKey}>
-            <Section />
-            {sectionKey === "benefits" && <ArticlePreviewSection />}
-          </SectionFrame>
-        );
-      })}
+      <FAQ />
+      <SectionFrame sectionKey="footer" reorderable={false}>
+        <Footer />
+      </SectionFrame>
     </>
   );
 }
 
-function PublicFaq() {
+export function PublicArticles() {
   return (
     <>
-      <Navbar />
-      <FAQ />
-      <Footer />
+      <SectionFrame sectionKey="navbar" reorderable={false}>
+        <Navbar />
+      </SectionFrame>
+      <SectionFrame sectionKey="articles" reorderable={false}>
+        <ArticlesList />
+      </SectionFrame>
+      <SectionFrame sectionKey="footer" reorderable={false}>
+        <Footer />
+      </SectionFrame>
     </>
   );
 }
@@ -119,19 +183,12 @@ function App() {
             <ScrollToTop />
             <Routes>
               <Route path="/" element={<PublicHome />} />
+              <Route path="/draft-preview/:draftId" element={<DraftPreview />} />
+              <Route path="/editor-frame/:draftId" element={<EditorFrame />} />
               <Route path="/login" element={<PublicLogin />} />
               <Route path="/settings" element={<AccountSettings />} />
               <Route path="/faq" element={<PublicFaq />} />
-              <Route
-                path="/articles"
-                element={
-                  <>
-                    <Navbar />
-                    <ArticlesList />
-                    <Footer />
-                  </>
-                }
-              />
+              <Route path="/articles" element={<PublicArticles />} />
               <Route
                 path="/articles/:articleId"
                 element={
@@ -148,7 +205,8 @@ function App() {
                 <Route index element={<Navigate to="/admin/dashboard" replace />} />
                 <Route path="dashboard" element={<AdminDashboard />} />
                 <Route path="articles" element={<ArticlesAdminPage />} />
-                <Route path="page-content" element={<VisualPageEditor />} />
+                <Route path="page-content" element={<PageContentList />} />
+                <Route path="page-content/:draftId" element={<VisualPageEditor />} />
                 <Route path="hero" element={<SiteContentEditor configKey="hero" />} />
                 <Route
                   path="services"
@@ -172,9 +230,9 @@ function App() {
               </Route>
             </Routes>
           </Suspense>
-          <NewsletterPromptDrawer />
+          {!isEmbedded && <NewsletterPromptDrawer />}
         </NewsletterPromptProvider>
-        <FloatingClientPreview />
+        {!isEmbedded && <FloatingClientPreview />}
         <ForcePasswordChangeGate />
       </Router>
     </AuthProvider>

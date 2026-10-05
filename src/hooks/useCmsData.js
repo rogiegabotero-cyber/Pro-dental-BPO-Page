@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   collection,
   doc,
@@ -9,6 +9,7 @@ import {
 import { db } from "../firebase";
 import { defaultLayoutContent } from "../data/defaultContent";
 import { useLayoutEditorContext } from "../context/LayoutEditorContext";
+import { DraftContentContext } from "../context/DraftContentContext";
 import { emptySpacing, buildSpacingStyle } from "../utils/spacing";
 
 const sortByOrder = (items) =>
@@ -30,10 +31,19 @@ const emptySectionStyle = {
 };
 
 export function useCmsDocument(documentId, fallback) {
+  const draft = useContext(DraftContentContext);
+  const draftDoc = draft?.docs?.[documentId];
   const [data, setData] = useState(fallback);
   const [loading, setLoading] = useState(true);
+  const draftData = useMemo(
+    () => (draftDoc ? { ...fallback, ...draftDoc } : null),
+    [draftDoc, fallback]
+  );
+  const hasDraftDoc = Boolean(draftDoc);
 
   useEffect(() => {
+    if (hasDraftDoc) return undefined;
+
     const unsubscribe = onSnapshot(
       doc(db, "siteContent", documentId),
       (snapshot) => {
@@ -47,16 +57,26 @@ export function useCmsDocument(documentId, fallback) {
     );
 
     return unsubscribe;
-  }, [documentId, fallback]);
+  }, [documentId, fallback, hasDraftDoc]);
 
+  if (draftData) return { data: draftData, loading: false };
   return { data, loading };
 }
 
 export function useCmsCollection(collectionName, fallback) {
+  const draft = useContext(DraftContentContext);
+  const draftItems = draft?.collections?.[collectionName];
   const [items, setItems] = useState(sortByOrder(fallback));
   const [loading, setLoading] = useState(true);
+  const draftSorted = useMemo(
+    () => (draftItems?.length ? sortByOrder(draftItems.filter((item) => item.published !== false)) : null),
+    [draftItems]
+  );
+  const hasDraftItems = Boolean(draftItems?.length);
 
   useEffect(() => {
+    if (hasDraftItems) return undefined;
+
     const collectionQuery = query(collection(db, collectionName), orderBy("order", "asc"));
 
     const unsubscribe = onSnapshot(
@@ -76,8 +96,9 @@ export function useCmsCollection(collectionName, fallback) {
     );
 
     return unsubscribe;
-  }, [collectionName, fallback]);
+  }, [collectionName, fallback, hasDraftItems]);
 
+  if (draftSorted) return { items: draftSorted, loading: false };
   return { items, loading };
 }
 
@@ -94,6 +115,15 @@ export function normalizeSectionOrder(order, knownKeys) {
   });
 
   return filtered;
+}
+
+// Pages the admin inserted between built-in sections. They're stored on the
+// layout doc as `customSections: { [id]: { title, body } }` and appear in
+// `order` / `styles` under the key `custom-<id>`.
+export const CUSTOM_SECTION_PREFIX = "custom-";
+
+export function customSectionKeys(customSections) {
+  return Object.keys(customSections || {}).map((id) => `${CUSTOM_SECTION_PREFIX}${id}`);
 }
 
 export function useCmsLayout() {
